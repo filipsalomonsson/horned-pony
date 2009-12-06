@@ -114,20 +114,30 @@ class HornedServer(object):
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(('', 6666))
-        self.sock.listen(10)
+        self.sock.listen(50)
 
     def serve_forever(self):
-        handler = WSGIRequestHandler(demo_app, self)
+        children = set()
+        for n in range(3):
+            pid = os.fork()
+            if pid:
+                children.add(pid)
+            else:
+                try:
+                    handler = WSGIRequestHandler(demo_app, self)
+                    while True:
+                        socks, _, _ = select.select([self.sock], [], [])
+                        for sock in socks:
+                            connection, address = sock.accept()
+                            handler(connection, address)
+                            connection.close()
+                except KeyboardInterrupt:
+                    os._exit(1)
+                os._exit(0)
 
-        try:
-            while True:
-                socks, _, _ = select.select([self.sock], [], [])
-                for sock in socks:
-                    connection, address = sock.accept()
-                    handler(connection, address)
-                    connection.close()
-        except KeyboardInterrupt:
-            sys.exit(1)
+        while children:
+            pid, status = os.wait()
+            children.remove(pid)
 
 
 if __name__ == '__main__':
