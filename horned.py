@@ -11,9 +11,12 @@ def demo_app(environ,start_response):
     return ["Hello world!\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
 
 class WSGIRequestHandler(object):
-    def __init__(self, application):
+    def __init__(self, application, server):
         self.application = application
         env = self.baseenv = os.environ.copy()
+        host, port = server.sock.getsockname()[:2]
+        env["SERVER_NAME"] = socket.getfqdn(host)
+        env["SERVER_PORT"] = str(port)
 
     def __call__(self, connection, address):
         rfile = connection.makefile("rb", -1)
@@ -27,9 +30,6 @@ class WSGIRequestHandler(object):
         env["SERVER_PROTOCOL"] = protocol
         env["REQUEST_METHOD"] = method
         env["SCRIPT_NAME"] = path
-        host, port = connection.getsockname()[:2]
-        env["SERVER_NAME"] = socket.getfqdn(host)
-        env["SERVER_PORT"] = str(port)
         env["PATH_INFO"] = path
         env["REMOTE_ADDR"] = address[0]
 
@@ -79,7 +79,7 @@ class HornedServer(object):
         self.sock.listen(10)
 
     def serve_forever(self):
-        handler = WSGIRequestHandler(demo_app)
+        handler = WSGIRequestHandler(demo_app, self)
 
         try:
             while True:
