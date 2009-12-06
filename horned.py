@@ -6,7 +6,58 @@ import os
 import socket
 import select
 
-from wsgiref.simple_server import demo_app, WSGIRequestHandler
+def demo_app(environ,start_response):
+    start_response("200 OK", [('Content-Type','text/plain')])
+    return ["Hello world!\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
+
+def WSGIRequestHandler(connection, address, app):
+    #env = os.environ.copy()
+    env = {}
+    rfile = connection.makefile("rb", -1)
+    wfile = connection.makefile("wb", 0)
+
+    reqline = rfile.readline()[:-2]
+    method, path, protocol = reqline.split(" ", 2)
+    
+    env["SERVER_PROTOCOL"] = protocol
+    env["REQUEST_METHOD"] = method
+    env["SCRIPT_NAME"] = path
+    host, port = connection.getsockname()[:2]
+    env["SERVER_NAME"] = socket.getfqdn(host)
+    env["SERVER_PORT"] = str(port)
+    env["PATH_INFO"] = path
+    env["REMOTE_ADDR"] = address[0]
+    
+    headers = {}
+    while True:
+        line = rfile.readline().rstrip("\r\n")
+        if line == "":
+            break
+        key, value = line.split(":", 1)
+        headers[key.lower()] = value
+    
+        for key, value in headers.iteritems():
+            env["HTTP_" + key.replace("-", "_").upper()] = value
+    
+    def start_response(status, response_headers, exc_info=None):
+        wfile.write('HTTP/1.1 %s\r\n' % status)
+        for header in response_headers:
+            wfile.write('%s: %s\r\n' % header)
+            wfile.write('\r\n')
+        return wfile.write 
+
+    response_data = app(env, start_response)
+
+    for chunk in response_data:
+        wfile.write(chunk)
+    if hasattr(response_data, "close"):
+        response_data.close()
+    
+    # PATH_INFO
+    # QUERY_STRING?
+    # CONTENT_TYPE?
+    # CONTENT_LENGTH?
+    # HTTP_*
 
 class HornedServer(object):
     def __init__(self, app):
@@ -28,12 +79,9 @@ class HornedServer(object):
                 socks, _, _ = select.select([self.sock], [], [])
                 for sock in socks:
                     connection, address = sock.accept()
-                    print os.getpid()
-                    handler = WSGIRequestHandler(connection,
-                                                 address,
-                                                 self)
+                    handler = WSGIRequestHandler(connection, address, demo_app)
                     connection.close()
-        except:
+        except KeyboardInterrupt:
             sys.exit(1)
 
 
