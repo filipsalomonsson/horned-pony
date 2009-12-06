@@ -58,6 +58,9 @@ class WSGIRequestHandler(object):
         if hasattr(response_data, "close"):
             response_data.close()
 
+        rfile.close()
+        wfile.close()
+
         # PATH_INFO
         # QUERY_STRING?
         # CONTENT_TYPE?
