@@ -10,6 +10,39 @@ def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/plain')])
     return ["Hello world!\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
 
+class HTTPResponse(object):
+    def __init__(self, connection, address):
+        self.wfile = connection.makefile("wb", 0)
+        self.status = None
+        self.headers = []
+        self.headers_sent = False
+
+    def write(self, data):
+        write = self.wfile.write
+        if not self.headers_sent:
+            write('HTTP/1.1 %s\r\n' % self.status)
+            for header in self.headers:
+                write('%s: %s\r\n' % header)
+            write('\r\n')
+            self.headers_sent = True
+        write(data)
+
+    def start_response(self, status, response_headers, exc_info=None):
+        self.status = status
+        self.headers = response_headers
+        return self.write
+
+    def send(self, data):
+        write = self.write
+        for chunk in data:
+            write(chunk)
+        if not self.headers_sent:
+            write("")
+        if hasattr(data, "close"):
+            response_data.close()
+        self.wfile.close()
+
+
 class WSGIRequestHandler(object):
     def __init__(self, application, server):
         self.application = application
@@ -20,7 +53,6 @@ class WSGIRequestHandler(object):
 
     def __call__(self, connection, address):
         rfile = connection.makefile("rb", -1)
-        wfile = connection.makefile("wb", 0)
 
         reqline = rfile.readline()[:-2]
         method, path, protocol = reqline.split(" ", 2)
@@ -52,22 +84,11 @@ class WSGIRequestHandler(object):
             for key, value in headers.iteritems():
                 env["HTTP_" + key.replace("-", "_").upper()] = value
 
-        def start_response(status, response_headers, exc_info=None):
-            wfile.write('HTTP/1.1 %s\r\n' % status)
-            for header in response_headers:
-                wfile.write('%s: %s\r\n' % header)
-                wfile.write('\r\n')
-            return wfile.write 
-
-        response_data = self.application(env, start_response)
-
-        for chunk in response_data:
-            wfile.write(chunk)
-        if hasattr(response_data, "close"):
-            response_data.close()
+        response = HTTPResponse(connection, address)
+        response.send(self.application(env, response.start_response))
 
         rfile.close()
-        wfile.close()
+
 
         # PATH_INFO
         # QUERY_STRING?
