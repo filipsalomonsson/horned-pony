@@ -33,6 +33,14 @@ class WSGIRequestHandler(object):
         env["PATH_INFO"] = path
         env["REMOTE_ADDR"] = address[0]
 
+        env["wsgi.version"] = (1, 0)
+        env["wsgi.url_scheme"] = "http"
+        env["wsgi.input"] = rfile
+        env["wsgi.errors"] = sys.stderr
+        env["wsgi.multithread"] = False
+        env["wsgi.multiprocess"] = True
+        env["wsgi.run_once"] = False
+
         headers = {}
         while True:
             line = rfile.readline().rstrip("\r\n")
