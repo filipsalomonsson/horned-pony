@@ -28,6 +28,12 @@ class HTTPResponse(object):
         write(data)
 
     def start_response(self, status, response_headers, exc_info=None):
+        if exc_info is not None:
+            try:
+                if self.headers_sent:
+                    raise exc_info[0], exc_info[1], exc_info[2]
+            finally:
+                exc_info = None
         self.status = status
         self.headers = response_headers
         return self.write
