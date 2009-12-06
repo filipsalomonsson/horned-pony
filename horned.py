@@ -5,6 +5,7 @@ import sys
 import os
 import socket
 import select
+import urllib
 
 def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/plain')])
@@ -67,9 +68,12 @@ class WSGIRequestHandler(object):
 
         env["SERVER_PROTOCOL"] = protocol
         env["REQUEST_METHOD"] = method
-        env["SCRIPT_NAME"] = path
-        env["PATH_INFO"] = path
         env["REMOTE_ADDR"] = address[0]
+        env["SCRIPT_NAME"] = path
+        if "?" in path:
+            path, _, query = path.partition("?")
+            env["QUERY_STRING"] = query
+        env["PATH_INFO"] = urllib.unquote(path)
 
         env["wsgi.version"] = (1, 0)
         env["wsgi.url_scheme"] = "http"
@@ -97,12 +101,6 @@ class WSGIRequestHandler(object):
 
         rfile.close()
 
-
-        # PATH_INFO
-        # QUERY_STRING?
-        # CONTENT_TYPE?
-        # CONTENT_LENGTH?
-        # HTTP_*
 
 class HornedServer(object):
     def __init__(self, app):
