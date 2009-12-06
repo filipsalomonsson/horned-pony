@@ -74,15 +74,17 @@ class WSGIRequestHandler(object):
         env["wsgi.run_once"] = False
 
         headers = {}
-        while True:
-            line = rfile.readline().rstrip("\r\n")
-            if line == "":
+        for line in rfile:
+            line = line[:-2]
+            if not line:
                 break
-            key, value = line.split(":", 1)
-            headers[key.lower()] = value
+            key, _, value = line.partition(":")
+            headers[key] = value.strip()
 
             for key, value in headers.iteritems():
-                env["HTTP_" + key.replace("-", "_").upper()] = value
+                key = key.replace("-", "_").upper()
+                value = value.strip()
+                env["HTTP_" + key] = value
 
         response = HTTPResponse(connection, address)
         response.send(self.application(env, response.start_response))
