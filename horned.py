@@ -123,11 +123,11 @@ class WSGIRequestHandler(object):
 
 
 class HornedManager(object):
-    def __init__(self, app, workers=3):
+    def __init__(self, app, worker_processes=3):
         self.app = app
-        self.workers = workers
+        self.worker_processes = worker_processes
         self.base_environ = {}
-        self.worker_pids = set()
+        self.workers = set()
         self.alive = True
 
         signal.signal(signal.SIGINT, self.die_gracefully)
@@ -143,32 +143,43 @@ class HornedManager(object):
             self.cleanup_workers()
             self.spawn_workers()
             time.sleep(1)
-        for pid in self.worker_pids:
-            logging.info("Sending SIGINT to worker #%d" % pid)
-            os.kill(pid, signal.SIGINT)
+        for worker in self.workers:
+            logging.info("Sending SIGINT to worker #%d" % worker.pid)
+            os.kill(worker.pid, signal.SIGINT)
 
     def cleanup_workers(self):
-        for pid in list(self.worker_pids):
-            pid, status = os.waitpid(pid, os.WNOHANG)
+        for worker in list(self.workers):
+            pid, status = os.waitpid(worker.pid, os.WNOHANG)
             if pid:
-                self.worker_pids.remove(pid)
+                self.worker.remove(worker)
                 logging.info("Worker #%d died" % pid)
 
     def spawn_workers(self):
-        while len(self.worker_pids) < self.workers:
-            worker_pid = os.fork()
-            if worker_pid:
-                self.worker_pids.add(worker_pid)
-                logging.info("Spawned worker #%d" % worker_pid)
-            else:
-                worker = HornedWorker(self.sock, self.app)
-                worker.serve_forever()
+        while len(self.workers) < self.worker_processes:
+            worker = HornedWorker(self.sock, self.app)
+            self.workers.add(worker)
+            worker.run()
 
     def die_gracefully(self, signum, frame):
         self.alive = False
 
 
-class HornedWorker(object):
+class HornedWorker:
+    def __init__(self, sock, app):
+        self.sock = sock
+        self.app = app
+        self.pid = None
+
+    def run(self):
+        pid = os.fork()
+        if pid:
+            logging.info("Spawned worked #%d" % pid)
+            self.pid = pid
+        else:
+            HornedWorkerProcess(self.sock, self.app).serve_forever()
+
+
+class HornedWorkerProcess(object):
     def __init__(self, sock, app):
         self.sock = sock
         self.app = app
