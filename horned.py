@@ -141,7 +141,7 @@ class HornedManager(object):
             if worker_pid:
                 self.worker_pids.add(worker_pid)
             else:
-                worker = HornedWorker(self.sock)
+                worker = HornedWorker(self.sock, self.app)
                 worker.serve_forever()
 
     def die_gracefully(self, signum, frame):
@@ -149,8 +149,9 @@ class HornedManager(object):
 
 
 class HornedWorker(object):
-    def __init__(self, sock):
+    def __init__(self, sock, app):
         self.sock = sock
+        self.app = app
         self.alive = True
 
         self.rpipe, self.wpipe = os.pipe()
@@ -158,7 +159,7 @@ class HornedWorker(object):
         signal.signal(signal.SIGINT, self.die_gracefully)
 
     def serve_forever(self):
-        handler = WSGIRequestHandler(demo_app, self)
+        handler = WSGIRequestHandler(self.app, self)
         while self.alive:
             try:
                 socks, _, _ = select.select([self.sock, self.rpipe], [], [])
