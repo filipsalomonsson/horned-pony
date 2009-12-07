@@ -266,7 +266,7 @@ class HornedWorkerProcess(object):
         response.send(self.app(env, response.start_response))
 
         rfile.close()
-        
+        connection.close()
 
 if __name__ == '__main__':
     worker = HornedManager(demo_app)
