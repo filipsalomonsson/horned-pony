@@ -19,6 +19,19 @@ def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/plain')])
     return ["Hello world!\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
 
+HTTP_WDAY = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+HTTP_MONTH = (None, "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+def http_date(timestamp=None):
+    timestamp = timestamp or time.time()
+    (year, month, day, hour, minute, second,
+     weekday, yearday, isdst) = time.gmtime(timestamp)
+    return "%s, %02d %3s %4d %02d:%02d:%02d GMT" % \
+        (HTTP_WDAY[weekday], day, HTTP_MONTH[month], year,
+         hour, minute, second)
+
+
 class HTTPResponse(object):
     def __init__(self, connection, address):
         self.wfile = connection.makefile("wb", 0)
@@ -29,10 +42,13 @@ class HTTPResponse(object):
     def write(self, data):
         write = self.wfile.write
         if not self.headers_sent:
-            write('HTTP/1.1 %s\r\n' % self.status)
+            write("HTTP/1.1 %s\r\n" % self.status)
+            write("Date: %s\r\n" % (http_date(),))
             for header in self.headers:
-                write('%s: %s\r\n' % header)
-            write('\r\n')
+                if header[0].lower() not in ("connection", "date"):
+                    write("%s: %s\r\n" % header)
+            write("Connection: close\r\n")
+            write("\r\n")
             self.headers_sent = True
         write(data)
 
