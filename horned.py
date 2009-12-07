@@ -164,7 +164,11 @@ class HornedWorker(object):
                     continue
             for sock in socks:
                 connection, address = sock.accept()
-                handler(connection, address)
+                try:
+                    handler(connection, address)
+                except socket.error, e:
+                    if e[0] == errno.EPIPE:
+                        pass
                 connection.close()
         sys.exit(0)
             
