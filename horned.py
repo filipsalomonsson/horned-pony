@@ -144,8 +144,7 @@ class HornedManager(object):
             self.spawn_workers()
             time.sleep(1)
         for worker in self.workers:
-            logging.info("Sending SIGINT to worker #%d" % worker.pid)
-            os.kill(worker.pid, signal.SIGINT)
+            worker.die_gracefully()
 
     def cleanup_workers(self):
         for worker in list(self.workers):
@@ -177,6 +176,10 @@ class HornedWorker:
             self.pid = pid
         else:
             HornedWorkerProcess(self.sock, self.app).serve_forever()
+
+    def die_gracefully(self):
+        logging.info("Sending SIGINT to worker #%d" % self.pid)
+        os.kill(self.pid, signal.SIGINT)
 
 
 class HornedWorkerProcess(object):
