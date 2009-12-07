@@ -11,6 +11,7 @@ import errno
 import urllib
 import logging
 import struct
+from cStringIO import StringIO
 
 logging.basicConfig(level=logging.DEBUG,
                     format="%(asctime)s %(levelname)s %(message)s",
@@ -46,48 +47,6 @@ def http_date(timestamp=None):
     return "%s, %02d %3s %4d %02d:%02d:%02d GMT" % \
         (HTTP_WDAY[weekday], day, HTTP_MONTH[month], year,
          hour, minute, second)
-
-
-class HTTPResponse(object):
-    def __init__(self, connection, address):
-        self.wfile = connection.makefile("wb", 0)
-        self.status = None
-        self.headers = []
-        self.headers_sent = False
-
-    def write(self, data):
-        write = self.wfile.write
-        if not self.headers_sent:
-            write("HTTP/1.1 %s\r\n" % self.status)
-            write("Date: %s\r\n" % (http_date(),))
-            for header in self.headers:
-                if header[0].lower() not in ("connection", "date"):
-                    write("%s: %s\r\n" % header)
-            write("Connection: close\r\n")
-            write("\r\n")
-            self.headers_sent = True
-        write(data)
-
-    def start_response(self, status, response_headers, exc_info=None):
-        if exc_info is not None:
-            try:
-                if self.headers_sent:
-                    raise exc_info[0], exc_info[1], exc_info[2]
-            finally:
-                exc_info = None
-        self.status = status
-        self.headers = response_headers
-        return self.write
-
-    def send(self, data):
-        write = self.write
-        for chunk in data:
-            write(chunk)
-        if not self.headers_sent:
-            write("")
-        if hasattr(data, "close"):
-            data.close()
-        self.wfile.close()
 
 
 class HornedManager(object):
@@ -228,15 +187,28 @@ class HornedWorkerProcess(object):
         self.alive = False
         os.write(self.wpipe, ".")
 
-    def parse_request(self, stream, address):
-        reqline = stream.readline()[:-2]
+    def handle_request(self, connection, address):
+        self.initialize_request(connection, address)
+        env = self.parse_request()
+        result = self.execute_request(self.app, env)
+        self.send_response(*result)
+        self.finalize_request(connection, address)
+
+    def initialize_request(self, connection, address):
+        self.request = connection.makefile("rb", -1)
+        self.response = connection.makefile("wb", 0)
+        self.client_address = address
+        self.headers_sent = False
+
+    def parse_request(self):
+        reqline = self.request.readline()[:-2]
         method, path, protocol = reqline.split(" ", 2)
 
         env = self.baseenv.copy()
 
         env["SERVER_PROTOCOL"] = protocol
         env["REQUEST_METHOD"] = method
-        env["REMOTE_ADDR"] = address[0]
+        env["REMOTE_ADDR"] = self.client_address[0]
         env["SCRIPT_NAME"] = path
         if "?" in path:
             path, _, query = path.partition("?")
@@ -245,13 +217,13 @@ class HornedWorkerProcess(object):
 
         env["wsgi.version"] = (1, 0)
         env["wsgi.url_scheme"] = "http"
-        env["wsgi.input"] = stream
+        env["wsgi.input"] = self.request
         env["wsgi.errors"] = sys.stderr
         env["wsgi.multithread"] = False
         env["wsgi.multiprocess"] = True
         env["wsgi.run_once"] = False
 
-        for line in stream:
+        for line in self.request:
             line = line[:-2]
             if not line:
                 break
@@ -262,16 +234,49 @@ class HornedWorkerProcess(object):
 
         return env
 
-    def handle_request(self, connection, address):
-        stream = connection.makefile("rb", -1)
-        env = self.parse_request(stream, address)
+    def execute_request(self, app, env):
+        data = StringIO()
+        response = [None, [], data]
+        def start_response(status, response_headers, exc_info=None):
+            if exc_info is not None:
+                try:
+                    if self.headers_sent:
+                        raise exc_info[0], exc_info[1], exc_info[2]
+                finally:
+                    exc_info = None
 
-        response = HTTPResponse(connection, address)
-        response.send(self.app(env, response.start_response))
+            response[0:2] = [status, response_headers]
+            return data.write
+        chunks = self.app(env, start_response)
+        status, headers, data = response
+        return status, headers, chunks, data.getvalue()
 
-        stream.close()
+    def finalize_request(self, connection, address):
+        self.request.close()
+        self.response.close()
         connection.close()
 
+    def send_headers(self, status, headers):
+        write = self.response.write
+        if not self.headers_sent:
+            write("HTTP/1.1 %s\r\n" % status)
+            write("Date: %s\r\n" % (http_date(),))
+            for header in headers:
+                if header[0].lower() not in ("connection", "date"):
+                    write("%s: %s\r\n" % header)
+            write("Connection: close\r\n")
+            write("\r\n")
+            self.headers_sent = True
+
+    def send_response(self, status, headers, chunks, data=None):
+        write = self.response.write
+        for chunks in [[data], chunks, [""]]:
+            for chunk in chunks:
+                if not self.headers_sent:
+                    self.send_headers(status, headers)
+                write(chunk)
+        if hasattr(chunks, "close"):
+            chunks.close()
 
 if __name__ == '__main__':
     worker = HornedManager(demo_app)
