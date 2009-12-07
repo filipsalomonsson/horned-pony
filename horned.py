@@ -90,54 +90,6 @@ class HTTPResponse(object):
         self.wfile.close()
 
 
-class WSGIRequestHandler(object):
-    def __init__(self, application, server):
-        self.application = application
-        env = self.baseenv = os.environ.copy()
-        host, port = server.sock.getsockname()[:2]
-        env["SERVER_NAME"] = socket.getfqdn(host)
-        env["SERVER_PORT"] = str(port)
-
-    def __call__(self, connection, address):
-        rfile = connection.makefile("rb", -1)
-
-        reqline = rfile.readline()[:-2]
-        method, path, protocol = reqline.split(" ", 2)
-
-        env = self.baseenv.copy()
-
-        env["SERVER_PROTOCOL"] = protocol
-        env["REQUEST_METHOD"] = method
-        env["REMOTE_ADDR"] = address[0]
-        env["SCRIPT_NAME"] = path
-        if "?" in path:
-            path, _, query = path.partition("?")
-            env["QUERY_STRING"] = query
-        env["PATH_INFO"] = urllib.unquote(path)
-
-        env["wsgi.version"] = (1, 0)
-        env["wsgi.url_scheme"] = "http"
-        env["wsgi.input"] = rfile
-        env["wsgi.errors"] = sys.stderr
-        env["wsgi.multithread"] = False
-        env["wsgi.multiprocess"] = True
-        env["wsgi.run_once"] = False
-
-        for line in rfile:
-            line = line[:-2]
-            if not line:
-                break
-            key, _, value = line.partition(":")
-            key = key.replace("-", "_").upper()
-            value = value.strip()
-            env["HTTP_" + key] = value
-
-        response = HTTPResponse(connection, address)
-        response.send(self.application(env, response.start_response))
-
-        rfile.close()
-
-
 class HornedManager(object):
     def __init__(self, app, worker_processes=3):
         self.app = app
@@ -236,10 +188,14 @@ class HornedWorkerProcess(object):
 
         self.rpipe, self.wpipe = os.pipe()
 
+        env = self.baseenv = os.environ.copy()
+        host, port = sock.getsockname()[:2]
+        env["SERVER_NAME"] = socket.getfqdn(host)
+        env["SERVER_PORT"] = str(port)
+
         signal.signal(signal.SIGINT, self.die_gracefully)
 
     def serve_forever(self):
-        handler = WSGIRequestHandler(self.app, self)
         while self.alive:
             self.report_status(WAITING)
             try:
@@ -251,7 +207,7 @@ class HornedWorkerProcess(object):
                 self.report_status(PROCESSING)
                 connection, address = sock.accept()
                 try:
-                    handler(connection, address)
+                    self.handle_request(connection, address)
                     self.requests += 1
                 except socket.error, e:
                     if e[0] == errno.EPIPE:
@@ -271,6 +227,46 @@ class HornedWorkerProcess(object):
         self.report_status(SHUTTING_DOWN)
         self.alive = False
         os.write(self.wpipe, ".")
+
+    def handle_request(self, connection, address):
+        rfile = connection.makefile("rb", -1)
+
+        reqline = rfile.readline()[:-2]
+        method, path, protocol = reqline.split(" ", 2)
+
+        env = self.baseenv.copy()
+
+        env["SERVER_PROTOCOL"] = protocol
+        env["REQUEST_METHOD"] = method
+        env["REMOTE_ADDR"] = address[0]
+        env["SCRIPT_NAME"] = path
+        if "?" in path:
+            path, _, query = path.partition("?")
+            env["QUERY_STRING"] = query
+        env["PATH_INFO"] = urllib.unquote(path)
+
+        env["wsgi.version"] = (1, 0)
+        env["wsgi.url_scheme"] = "http"
+        env["wsgi.input"] = rfile
+        env["wsgi.errors"] = sys.stderr
+        env["wsgi.multithread"] = False
+        env["wsgi.multiprocess"] = True
+        env["wsgi.run_once"] = False
+
+        for line in rfile:
+            line = line[:-2]
+            if not line:
+                break
+            key, _, value = line.partition(":")
+            key = key.replace("-", "_").upper()
+            value = value.strip()
+            env["HTTP_" + key] = value
+
+        response = HTTPResponse(connection, address)
+        response.send(self.app(env, response.start_response))
+
+        rfile.close()
+        
 
 if __name__ == '__main__':
     worker = HornedManager(demo_app)
