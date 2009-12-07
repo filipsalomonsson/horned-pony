@@ -106,8 +106,9 @@ class WSGIRequestHandler(object):
 
 
 class HornedManager(object):
-    def __init__(self, app):
+    def __init__(self, app, workers=3):
         self.app = app
+        self.workers = workers
         self.base_environ = {}
         self.worker_pids = set()
         self.alive = True
@@ -124,18 +125,21 @@ class HornedManager(object):
         self.sock.listen(50)
 
     def serve_forever(self):
-        for n in range(3):
-            pid = os.fork()
-            if pid:
-                self.worker_pids.add(pid)
-            else:
-                worker = HornedWorker(self.sock)
-                worker.serve_forever()
+        self.spawn_workers()
 
         while self.alive:
             time.sleep(1)
         for pid in self.worker_pids:
             os.kill(pid, signal.SIGINT)
+
+    def spawn_workers(self):
+        for n in range(self.workers):
+            worker_pid = os.fork()
+            if worker_pid:
+                self.worker_pids.add(worker_pid)
+            else:
+                worker = HornedWorker(self.sock)
+                worker.serve_forever()
 
     def die_gracefully(self, signum, frame):
         self.alive = False
