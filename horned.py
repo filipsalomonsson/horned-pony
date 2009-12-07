@@ -109,6 +109,7 @@ class HornedManager(object):
     def __init__(self, app):
         self.app = app
         self.base_environ = {}
+        self.worker_pids = set()
         self.alive = True
 
         signal.signal(signal.SIGINT, self.die_gracefully)
@@ -123,18 +124,17 @@ class HornedManager(object):
         self.sock.listen(50)
 
     def serve_forever(self):
-        children = set()
         for n in range(3):
             pid = os.fork()
             if pid:
-                children.add(pid)
+                self.worker_pids.add(pid)
             else:
                 worker = HornedWorker(self.sock)
                 worker.serve_forever()
 
         while self.alive:
             time.sleep(1)
-        for pid in children:
+        for pid in self.worker_pids:
             os.kill(pid, signal.SIGINT)
 
     def die_gracefully(self, signum, frame):
