@@ -102,7 +102,7 @@ class WSGIRequestHandler(object):
         rfile.close()
 
 
-class HornedServer(object):
+class HornedManager(object):
     def __init__(self, app):
         self.app = app
         self.base_environ = {}
@@ -124,13 +124,8 @@ class HornedServer(object):
                 children.add(pid)
             else:
                 try:
-                    handler = WSGIRequestHandler(demo_app, self)
-                    while True:
-                        socks, _, _ = select.select([self.sock], [], [])
-                        for sock in socks:
-                            connection, address = sock.accept()
-                            handler(connection, address)
-                            connection.close()
+                    worker = HornedWorker(self.sock)
+                    worker.serve_forever()
                 except KeyboardInterrupt:
                     os._exit(1)
                 os._exit(0)
@@ -140,8 +135,22 @@ class HornedServer(object):
             children.remove(pid)
 
 
+class HornedWorker(object):
+    def __init__(self, sock):
+        self.sock = sock
+
+    def serve_forever(self):
+        handler = WSGIRequestHandler(demo_app, self)
+        while True:
+            socks, _, _ = select.select([self.sock], [], [])
+            for sock in socks:
+                connection, address = sock.accept()
+                handler(connection, address)
+                connection.close()
+            
+
 if __name__ == '__main__':
-    worker = HornedServer(demo_app)
+    worker = HornedManager(demo_app)
     worker.listen()
     worker.serve_forever()
 
