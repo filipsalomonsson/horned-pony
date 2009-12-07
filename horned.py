@@ -126,10 +126,17 @@ class HornedManager(object):
 
     def serve_forever(self):
         while self.alive:
+            self.cleanup_workers()
             self.spawn_workers()
             time.sleep(1)
         for pid in self.worker_pids:
             os.kill(pid, signal.SIGINT)
+
+    def cleanup_workers(self):
+        for pid in list(self.worker_pids):
+            pid, status = os.waitpid(pid, os.WNOHANG)
+            if pid:
+                self.worker_pids.remove(pid)
 
     def spawn_workers(self):
         while len(self.worker_pids) < self.workers:
