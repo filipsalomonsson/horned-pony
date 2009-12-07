@@ -228,7 +228,7 @@ class HornedWorkerProcess(object):
         self.alive = False
         os.write(self.wpipe, ".")
 
-    def handle_request(self, connection, address):
+    def parse_request(self, connection, address):
         rfile = connection.makefile("rb", -1)
 
         reqline = rfile.readline()[:-2]
@@ -262,11 +262,18 @@ class HornedWorkerProcess(object):
             value = value.strip()
             env["HTTP_" + key] = value
 
+        rfile.close()
+
+        return env
+
+    def handle_request(self, connection, address):
+        env = self.parse_request(connection, address)
+
         response = HTTPResponse(connection, address)
         response.send(self.app(env, response.start_response))
 
-        rfile.close()
         connection.close()
+
 
 if __name__ == '__main__':
     worker = HornedManager(demo_app)
