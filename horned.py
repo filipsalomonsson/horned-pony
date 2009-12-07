@@ -10,6 +10,7 @@ import signal
 import errno
 import urllib
 import logging
+import struct
 
 logging.basicConfig(level=logging.DEBUG,
                     format="%(asctime)s %(levelname)s %(message)s",
@@ -18,6 +19,21 @@ logging.basicConfig(level=logging.DEBUG,
 def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/plain')])
     return ["Hello world!\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
+
+status_struct = struct.Struct("bqqq")
+STARTING = 1
+WAITING = 2
+PROCESSING = 3
+SHUTTING_DOWN = 4
+DEAD = 5
+
+STATUS = {
+    STARTING: "starting",
+    WAITING: "waiting",
+    PROCESSING: "processing",
+    SHUTTING_DOWN: "shutting down",
+    DEAD: "dead",
+}
 
 HTTP_WDAY = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 HTTP_MONTH = (None, "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -131,6 +147,7 @@ class HornedManager(object):
         self.alive = True
 
         signal.signal(signal.SIGINT, self.die_gracefully)
+        signal.signal(signal.SIGHUP, self.report_status)
 
     def listen(self):
         self.sock = socket.socket()
@@ -142,6 +159,7 @@ class HornedManager(object):
         while self.alive:
             self.cleanup_workers()
             self.spawn_workers()
+            self.update_status()
             time.sleep(1)
         for worker in self.workers:
             worker.die_gracefully()
@@ -159,6 +177,18 @@ class HornedManager(object):
             self.workers.add(worker)
             worker.run()
 
+    def update_status(self):
+        for worker in self.workers:
+            worker.update_status()
+
+    def report_status(self, *args):
+        for worker in self.workers:
+            print "Worker #%d: %s. %d requests, %d errors" % \
+                (worker.pid,
+                 STATUS.get(worker.status, "unknown"),
+                 worker.requests,
+                 worker.errors)
+
     def die_gracefully(self, signum, frame):
         self.alive = False
 
@@ -168,6 +198,13 @@ class HornedWorker:
         self.sock = sock
         self.app = app
         self.pid = None
+        self.status = STARTING
+        self.timestamp = int(time.time())
+        self.requests = self.errors = 0
+
+        r, w = os.pipe()
+        self.rpipe = os.fdopen(r, "r", 0)
+        self.wpipe = os.fdopen(w, "w", 0)
 
     def run(self):
         pid = os.fork()
@@ -175,7 +212,13 @@ class HornedWorker:
             logging.info("Spawned worked #%d" % pid)
             self.pid = pid
         else:
-            HornedWorkerProcess(self.sock, self.app).serve_forever()
+            HornedWorkerProcess(self.sock, self.app, self.wpipe).serve_forever()
+
+    def update_status(self):
+        while select.select([self.rpipe], [], [], 0)[0]:
+            data = self.rpipe.read(status_struct.size)
+            data = status_struct.unpack(data)
+            (self.status, self.timestamp, self.requests, self.errors) = data
 
     def die_gracefully(self):
         logging.info("Sending SIGINT to worker #%d" % self.pid)
@@ -183,10 +226,13 @@ class HornedWorker:
 
 
 class HornedWorkerProcess(object):
-    def __init__(self, sock, app):
+    def __init__(self, sock, app, status_pipe):
         self.sock = sock
         self.app = app
+        self.status_pipe = status_pipe
         self.alive = True
+        self.requests = 0
+        self.errors = 0
 
         self.rpipe, self.wpipe = os.pipe()
 
@@ -195,22 +241,34 @@ class HornedWorkerProcess(object):
     def serve_forever(self):
         handler = WSGIRequestHandler(self.app, self)
         while self.alive:
+            self.report_status(WAITING)
             try:
                 socks, _, _ = select.select([self.sock, self.rpipe], [], [])
             except select.error, e:
                 if e[0] == errno.EINTR:
                     continue
             for sock in socks:
+                self.report_status(PROCESSING)
                 connection, address = sock.accept()
                 try:
                     handler(connection, address)
+                    self.requests += 1
                 except socket.error, e:
                     if e[0] == errno.EPIPE:
+                        self.errors += 1
                         logging.error("Broken pipe")
                 connection.close()
         sys.exit(0)
-            
+
+    def report_status(self, status):
+        self.status_pipe.write(status_struct.pack(status,
+                                                  int(time.time()),
+                                                  self.requests,
+                                                  self.errors))
+
+
     def die_gracefully(self, signum, frame):
+        self.report_status(SHUTTING_DOWN)
         self.alive = False
         os.write(self.wpipe, ".")
 
