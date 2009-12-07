@@ -151,7 +151,7 @@ class HornedManager(object):
         for worker in list(self.workers):
             pid, status = os.waitpid(worker.pid, os.WNOHANG)
             if pid:
-                self.worker.remove(worker)
+                self.workers.remove(worker)
                 logging.info("Worker #%d died" % pid)
 
     def spawn_workers(self):
