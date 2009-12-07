@@ -115,9 +115,6 @@ class HornedManager(object):
 
         signal.signal(signal.SIGINT, self.die_gracefully)
 
-    def get_app(self):
-        return self.app
-
     def listen(self):
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
