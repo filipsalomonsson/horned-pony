@@ -125,15 +125,14 @@ class HornedManager(object):
         self.sock.listen(50)
 
     def serve_forever(self):
-        self.spawn_workers()
-
         while self.alive:
+            self.spawn_workers()
             time.sleep(1)
         for pid in self.worker_pids:
             os.kill(pid, signal.SIGINT)
 
     def spawn_workers(self):
-        for n in range(self.workers):
+        while len(self.worker_pids) < self.workers:
             worker_pid = os.fork()
             if worker_pid:
                 self.worker_pids.add(worker_pid)
