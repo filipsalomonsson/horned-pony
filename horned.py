@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
 import os
+import sys
+import time
 import socket
 import select
+import signal
+import errno
 import urllib
 
 def demo_app(environ,start_response):
@@ -106,6 +109,9 @@ class HornedManager(object):
     def __init__(self, app):
         self.app = app
         self.base_environ = {}
+        self.alive = True
+
+        signal.signal(signal.SIGINT, self.die_gracefully)
 
     def get_app(self):
         return self.app
@@ -123,31 +129,44 @@ class HornedManager(object):
             if pid:
                 children.add(pid)
             else:
-                try:
-                    worker = HornedWorker(self.sock)
-                    worker.serve_forever()
-                except KeyboardInterrupt:
-                    os._exit(1)
-                os._exit(0)
+                worker = HornedWorker(self.sock)
+                worker.serve_forever()
 
-        while children:
-            pid, status = os.wait()
-            children.remove(pid)
+        while self.alive:
+            time.sleep(1)
+        for pid in children:
+            os.kill(pid, signal.SIGINT)
+
+    def die_gracefully(self, signum, frame):
+        self.alive = False
 
 
 class HornedWorker(object):
     def __init__(self, sock):
         self.sock = sock
+        self.alive = True
+
+        self.rpipe, self.wpipe = os.pipe()
+
+        signal.signal(signal.SIGINT, self.die_gracefully)
 
     def serve_forever(self):
         handler = WSGIRequestHandler(demo_app, self)
-        while True:
-            socks, _, _ = select.select([self.sock], [], [])
+        while self.alive:
+            try:
+                socks, _, _ = select.select([self.sock, self.rpipe], [], [])
+            except select.error, e:
+                if e[0] == errno.EINTR:
+                    continue
             for sock in socks:
                 connection, address = sock.accept()
                 handler(connection, address)
                 connection.close()
+        sys.exit(0)
             
+    def die_gracefully(self, signum, frame):
+        self.alive = False
+        os.write(self.wpipe, ".")
 
 if __name__ == '__main__':
     worker = HornedManager(demo_app)
