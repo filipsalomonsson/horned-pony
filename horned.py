@@ -228,10 +228,8 @@ class HornedWorkerProcess(object):
         self.alive = False
         os.write(self.wpipe, ".")
 
-    def parse_request(self, connection, address):
-        rfile = connection.makefile("rb", -1)
-
-        reqline = rfile.readline()[:-2]
+    def parse_request(self, stream, address):
+        reqline = stream.readline()[:-2]
         method, path, protocol = reqline.split(" ", 2)
 
         env = self.baseenv.copy()
@@ -247,13 +245,13 @@ class HornedWorkerProcess(object):
 
         env["wsgi.version"] = (1, 0)
         env["wsgi.url_scheme"] = "http"
-        env["wsgi.input"] = rfile
+        env["wsgi.input"] = stream
         env["wsgi.errors"] = sys.stderr
         env["wsgi.multithread"] = False
         env["wsgi.multiprocess"] = True
         env["wsgi.run_once"] = False
 
-        for line in rfile:
+        for line in stream:
             line = line[:-2]
             if not line:
                 break
@@ -262,16 +260,16 @@ class HornedWorkerProcess(object):
             value = value.strip()
             env["HTTP_" + key] = value
 
-        rfile.close()
-
         return env
 
     def handle_request(self, connection, address):
-        env = self.parse_request(connection, address)
+        stream = connection.makefile("rb", -1)
+        env = self.parse_request(stream, address)
 
         response = HTTPResponse(connection, address)
         response.send(self.app(env, response.start_response))
 
+        stream.close()
         connection.close()
 
 
