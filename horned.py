@@ -9,6 +9,11 @@ import select
 import signal
 import errno
 import urllib
+import logging
+
+logging.basicConfig(level=logging.DEBUG,
+                    format="%(asctime)s %(levelname)s %(message)s",
+                    datefmt="%Y-%m-%dT%H:%M:%S")
 
 def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/plain')])
@@ -123,6 +128,7 @@ class HornedManager(object):
             self.spawn_workers()
             time.sleep(1)
         for pid in self.worker_pids:
+            logging.info("Sending SIGINT to worker #%d" % pid)
             os.kill(pid, signal.SIGINT)
 
     def cleanup_workers(self):
@@ -130,12 +136,14 @@ class HornedManager(object):
             pid, status = os.waitpid(pid, os.WNOHANG)
             if pid:
                 self.worker_pids.remove(pid)
+                logging.info("Worker #%d died" % pid)
 
     def spawn_workers(self):
         while len(self.worker_pids) < self.workers:
             worker_pid = os.fork()
             if worker_pid:
                 self.worker_pids.add(worker_pid)
+                logging.info("Spawned worker #%d" % worker_pid)
             else:
                 worker = HornedWorker(self.sock, self.app)
                 worker.serve_forever()
@@ -168,7 +176,7 @@ class HornedWorker(object):
                     handler(connection, address)
                 except socket.error, e:
                     if e[0] == errno.EPIPE:
-                        pass
+                        logging.error("Broken pipe")
                 connection.close()
         sys.exit(0)
             
