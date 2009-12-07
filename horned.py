@@ -86,18 +86,14 @@ class WSGIRequestHandler(object):
         env["wsgi.multiprocess"] = True
         env["wsgi.run_once"] = False
 
-        headers = {}
         for line in rfile:
             line = line[:-2]
             if not line:
                 break
             key, _, value = line.partition(":")
-            headers[key] = value.strip()
-
-            for key, value in headers.iteritems():
-                key = key.replace("-", "_").upper()
-                value = value.strip()
-                env["HTTP_" + key] = value
+            key = key.replace("-", "_").upper()
+            value = value.strip()
+            env["HTTP_" + key] = value
 
         response = HTTPResponse(connection, address)
         response.send(self.application(env, response.start_response))
