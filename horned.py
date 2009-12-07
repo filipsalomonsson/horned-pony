@@ -86,7 +86,7 @@ class HTTPResponse(object):
         if not self.headers_sent:
             write("")
         if hasattr(data, "close"):
-            response_data.close()
+            data.close()
         self.wfile.close()
 
 
