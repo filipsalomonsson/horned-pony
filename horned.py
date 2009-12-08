@@ -241,7 +241,8 @@ class HornedWorkerProcess(object):
                         logging.error("Broken pipe")
                     elif e[0] == errno.EINTR:
                         logging.error("accept() interrupted")
-                connection.close()
+                finally:
+                    connection.close()
         sys.exit(0)
 
     def report_status(self, status):
