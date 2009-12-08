@@ -49,6 +49,73 @@ def http_date(timestamp=None):
          hour, minute, second)
 
 
+class HornedSocket(object):
+    def __init__(self, socket):
+        self.socket = socket
+        self.read_buffer = ""
+        self.write_buffer = ""
+
+    def read(self, size=-1):
+        if size < 0:
+            while True:
+                chunk = self.socket.recv(4096)
+                if not chunk:
+                    break
+                self.read_buffer += chunk
+            result = self.read_buffer
+            self.read_buffer = ""
+            return result
+        else:
+            while len(self.read_buffer) < size:
+                chunk = self.socket.recv(4096)
+                if not chunk:
+                    break
+            result = self.read_buffer[:size]
+            self.read_buffer = self.read_buffer[size:]
+            return result
+
+    def read_until(self, delimiter):
+        while delimiter not in self.read_buffer:
+            chunk = self.socket.recv(4096)
+            if not chunk:
+                break
+            self.read_buffer += chunk
+        index = self.read_buffer.find(delimiter)
+        if not index > 0:
+            raise ValueError()
+        result = self.read_buffer[:index+len(delimiter)]
+        self.read_buffer = self.read_buffer[index+len(delimiter):]
+        return result
+
+    def readline(self):
+        try:
+            return self.read_until("\n")
+        except ValueError:
+            return ""
+
+    def readlines(self):
+        return list(self)
+
+    def write(self, data):
+        self.write_buffer += data
+
+    def flush(self):
+        self.socket.sendall(self.write_buffer)
+        self.write_buffer = ""
+
+    def close(self):
+        self.flush()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        line = self.readline()
+        if not line:
+            raise StopIteration
+        return line
+
+
 class HornedManager(object):
     def __init__(self, app, worker_processes=3):
         self.app = app
@@ -195,13 +262,14 @@ class HornedWorkerProcess(object):
         self.finalize_request(connection, address)
 
     def initialize_request(self, connection, address):
-        self.request = connection.makefile("rb", -1)
-        self.response = connection.makefile("wb", 0)
+        self.stream = HornedSocket(connection)
         self.client_address = address
         self.headers_sent = False
 
     def parse_request(self):
-        reqline = self.request.readline()[:-2]
+        header_data = self.stream.read_until("\r\n\r\n")
+        lines = header_data.split("\r\n")
+        reqline = lines[0]
         method, path, protocol = reqline.split(" ", 2)
 
         env = self.baseenv.copy()
@@ -217,14 +285,13 @@ class HornedWorkerProcess(object):
 
         env["wsgi.version"] = (1, 0)
         env["wsgi.url_scheme"] = "http"
-        env["wsgi.input"] = self.request
+        env["wsgi.input"] = self.stream.socket.makefile("rb", -1)
         env["wsgi.errors"] = sys.stderr
         env["wsgi.multithread"] = False
         env["wsgi.multiprocess"] = True
         env["wsgi.run_once"] = False
 
-        for line in self.request:
-            line = line[:-2]
+        for line in lines[1:]:
             if not line:
                 break
             key, _, value = line.partition(":")
@@ -252,12 +319,10 @@ class HornedWorkerProcess(object):
         return status, headers, chunks, data
 
     def finalize_request(self, connection, address):
-        self.request.close()
-        self.response.close()
-        connection.close()
+        self.stream.close()
 
     def send_headers(self, status, headers):
-        write = self.response.write
+        write = self.stream.write
         if not self.headers_sent:
             write("HTTP/1.1 %s\r\n" % status)
             write("Date: %s\r\n" % (http_date(),))
@@ -267,9 +332,10 @@ class HornedWorkerProcess(object):
             write("Connection: close\r\n")
             write("\r\n")
             self.headers_sent = True
+            self.stream.flush()
 
     def send_response(self, status, headers, chunks, data=None):
-        write = self.response.write
+        write = self.stream.write
         for chunks in [data, chunks, [""]]:
             for chunk in chunks:
                 if not self.headers_sent:
