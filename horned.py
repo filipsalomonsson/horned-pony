@@ -187,7 +187,7 @@ class HornedWorker:
     def run(self):
         pid = os.fork()
         if pid:
-            logging.info("Spawned worked #%d" % pid)
+            logging.info("Spawned worker #%d" % pid)
             self.pid = pid
         else:
             HornedWorkerProcess(self.sock, self.app, self.wpipe).serve_forever()
