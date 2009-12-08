@@ -236,9 +236,11 @@ class HornedWorkerProcess(object):
                     self.handle_request(connection, address)
                     self.requests += 1
                 except socket.error, e:
+                    self.errors += 1
                     if e[0] == errno.EPIPE:
-                        self.errors += 1
                         logging.error("Broken pipe")
+                    elif e[0] == errno.EINTR:
+                        logging.error("accept() interrupted")
                 connection.close()
         sys.exit(0)
 
