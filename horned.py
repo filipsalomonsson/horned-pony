@@ -64,7 +64,7 @@ class HornedManager(object):
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(('', 6666))
-        self.sock.listen(50)
+        self.sock.listen(1024)
 
     def serve_forever(self):
         while self.alive:
