@@ -235,7 +235,7 @@ class HornedWorkerProcess(object):
         return env
 
     def execute_request(self, app, env):
-        data = StringIO()
+        data = []
         response = [None, [], data]
         def start_response(status, response_headers, exc_info=None):
             if exc_info is not None:
@@ -246,10 +246,10 @@ class HornedWorkerProcess(object):
                     exc_info = None
 
             response[0:2] = [status, response_headers]
-            return data.write
+            return data.append
         chunks = self.app(env, start_response)
         status, headers, data = response
-        return status, headers, chunks, data.getvalue()
+        return status, headers, chunks, data
 
     def finalize_request(self, connection, address):
         self.request.close()
@@ -270,7 +270,7 @@ class HornedWorkerProcess(object):
 
     def send_response(self, status, headers, chunks, data=None):
         write = self.response.write
-        for chunks in [[data], chunks, [""]]:
+        for chunks in [data, chunks, [""]]:
             for chunk in chunks:
                 if not self.headers_sent:
                     self.send_headers(status, headers)
