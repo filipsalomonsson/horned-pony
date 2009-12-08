@@ -231,8 +231,8 @@ class HornedWorkerProcess(object):
                     continue
             for sock in socks:
                 self.report_status(PROCESSING)
-                connection, address = sock.accept()
                 try:
+                    connection, address = sock.accept()
                     self.handle_request(connection, address)
                     self.requests += 1
                 except socket.error, e:
