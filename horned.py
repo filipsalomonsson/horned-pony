@@ -117,7 +117,7 @@ class HornedSocket(object):
 
 
 class HornedManager(object):
-    def __init__(self, app, worker_processes=3):
+    def __init__(self, app, worker_processes=4):
         self.app = app
         self.worker_processes = worker_processes
         self.base_environ = {}
