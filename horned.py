@@ -18,8 +18,8 @@ logging.basicConfig(level=logging.DEBUG,
                     datefmt="%Y-%m-%dT%H:%M:%S")
 
 def demo_app(environ,start_response):
-    start_response("200 OK", [('Content-Type','text/plain')])
-    return ["Hello world!\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
+    start_response("200 OK", [('Content-Type','text/html')])
+    return ["<html><body><h1>Hello world!</h1></body></html>\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
 
 status_struct = struct.Struct("bqqq")
 STARTING = 1
