@@ -8,13 +8,8 @@ import socket
 import select
 import signal
 import errno
-import logging
 import struct
 from cStringIO import StringIO
-
-logging.basicConfig(level=logging.DEBUG,
-                    format="%(asctime)s %(levelname)s %(message)s",
-                    datefmt="%Y-%m-%dT%H:%M:%S")
 
 try:
     import ctypes
@@ -33,6 +28,53 @@ try:
 except:
     def sendfile(outfile, infile, offset, length):
         pass
+
+DEBUG, INFO, ERROR = 1, 2, 3
+class Logger(object):
+    def __init__(self, stream=sys.stderr, level=INFO):
+        if isinstance(file, basestring):
+            self.stream = open(stream, "a", 0)
+        else:
+            self.stream = stream
+        self.level = level
+
+    def reopen(self):
+        filename = self.stream.name
+        if not name.startswith("<"):
+            try:
+                stream = open(filename, "a", 0)
+            except IOError:
+                self.error("Couldn't reopen log file %s; leaving open.",
+                           filename)
+            else:
+                self.stream.close()
+                self.stream = stream
+
+    def error(self, msg, *args, **kwargs):
+        if self.level >= ERROR:
+            self.write("error", msg, *args, **kwargs)
+
+    def info(self, msg, *args, **kwargs):
+        if self.level >= INFO:
+            self.write("info", msg, *args, **kwargs)
+
+    def debug(self, msg, *args, **kwargs):
+        if self.level >= DEBUG:
+            self.write("debug", msg, *args, **kwargs)
+
+    def write(self, level, msg, *args, **kwargs):
+       timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+       line = "%s %s" % (timestamp, msg % args)
+       if "pid" in kwargs:
+           prefix = "(#%d) " % kwargs["pid"]
+           line = prefix + line
+       self._write(line)
+
+    def _write(self, data):
+        self.stream.write(data + "\n")
+        self.stream.flush()
+
+logging = Logger()
 
 charfromhex = {}
 for i in xrange(256):
