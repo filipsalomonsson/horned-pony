@@ -8,7 +8,6 @@ import socket
 import select
 import signal
 import errno
-import urllib
 import logging
 import struct
 from cStringIO import StringIO
@@ -34,6 +33,19 @@ try:
 except:
     def sendfile(outfile, infile, offset, length):
         pass
+
+charfromhex = {}
+for i in xrange(256):
+    charfromhex["%02x" % i] = charfromhex["%02X" % i] = chr(i)
+
+def urlunquote(quoted):
+    unquoted = ""
+    while "%" in quoted:
+        before, _, after = quoted.partition("%")
+        code, quoted = after[:2], after[2:]
+        unquoted += before + charfromhex.get(code, "%" + code)
+    unquoted += quoted
+    return unquoted
 
 def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/html')])
@@ -312,7 +324,7 @@ class HornedWorkerProcess(object):
         if "?" in path:
             path, _, query = path.partition("?")
             env["QUERY_STRING"] = query
-        env["PATH_INFO"] = urllib.unquote(path)
+        env["PATH_INFO"] = urlunquote(path)
 
         env["wsgi.version"] = (1, 0)
         env["wsgi.url_scheme"] = "http"
