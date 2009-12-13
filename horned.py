@@ -17,9 +17,36 @@ logging.basicConfig(level=logging.DEBUG,
                     format="%(asctime)s %(levelname)s %(message)s",
                     datefmt="%Y-%m-%dT%H:%M:%S")
 
+try:
+    import ctypes
+    libc = ctypes.cdll.LoadLibrary("libc.so.6")
+    get_errno_loc = libc.__errno_location
+    get_errno_loc.restype = ctypes.POINTER(ctypes.c_int)
+
+    def errcheck(ret, func, args):
+        if ret == -1:
+            e = get_errno_loc()[0]
+            raise OSError(os.strerror(e))
+        return ret
+
+    sendfile = libc.sendfile
+    sendfile.errcheck = errcheck
+except:
+    def sendfile(outfile, infile, offset, length):
+        pass
+
 def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/html')])
     return ["<html><body><h1>Hello world!</h1></body></html>\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
+
+def sendfile_app(environ,start_response):
+    try:
+        file = open(environ.get("PATH_INFO", "")[1:])
+        start_response("200 OK", [('Content-Type','text/plain')])
+        return file
+    except IOError:
+        start_response("404 Not Found", [('Content-Type', 'text/plain')])
+        return ["Could not open %s." % environ.get("PATH_INFO")]
 
 status_struct = struct.Struct("bqqq")
 STARTING = 1
@@ -262,8 +289,7 @@ class HornedWorkerProcess(object):
     def handle_request(self, connection, address):
         self.initialize_request(connection, address)
         env = self.parse_request()
-        result = self.execute_request(self.app, env)
-        self.send_response(*result)
+        self.execute_request(self.app, env)
         self.finalize_request(connection, address)
 
     def initialize_request(self, connection, address):
@@ -321,7 +347,10 @@ class HornedWorkerProcess(object):
             return data.append
         chunks = self.app(env, start_response)
         status, headers, data = response
-        return status, headers, chunks, data
+        if isinstance(chunks, file):
+            self.send_file(status, headers, chunks)
+        else:
+            self.send_response(status, headers, chunks, data)
 
     def finalize_request(self, connection, address):
         self.stream.close()
@@ -338,6 +367,16 @@ class HornedWorkerProcess(object):
             write("\r\n")
             self.headers_sent = True
             self.stream.flush()
+
+    def send_file(self, status, headers, file):
+        self.send_headers(status, headers)
+        offset = ctypes.pointer(ctypes.c_int(0))
+        length = ctypes.c_int(os.fstat(file.fileno()).st_size)
+        retval = sendfile(self.stream.socket.fileno(),
+                          file.fileno(),
+                          offset,
+                          length)
+        file.close()
 
     def send_response(self, status, headers, chunks, data=None):
         write = self.stream.write
