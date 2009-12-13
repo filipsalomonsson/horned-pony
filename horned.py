@@ -282,7 +282,7 @@ class HornedWorkerProcess(object):
         env["SERVER_PROTOCOL"] = protocol
         env["REQUEST_METHOD"] = method
         env["REMOTE_ADDR"] = self.client_address[0]
-        env["SCRIPT_NAME"] = path
+        env["SCRIPT_NAME"] = ""
         if "?" in path:
             path, _, query = path.partition("?")
             env["QUERY_STRING"] = query
