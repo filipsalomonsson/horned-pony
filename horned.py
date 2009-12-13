@@ -187,9 +187,11 @@ class HornedWorker:
     def run(self):
         pid = os.fork()
         if pid:
+            self.wpipe.close()
             logging.info("Spawned worker #%d" % pid)
             self.pid = pid
         else:
+            self.rpipe.close()
             HornedWorkerProcess(self.sock, self.app, self.wpipe).serve_forever()
 
     def update_status(self):
