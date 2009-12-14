@@ -348,7 +348,7 @@ class HornedWorkerProcess(object):
     def handle_request(self, connection, address):
         self.initialize_request(connection, address)
         env = self.parse_request()
-        self.execute_request(self.app, env)
+        status, length = self.execute_request(self.app, env)
         self.finalize_request(connection, address)
 
     def initialize_request(self, connection, address):
@@ -407,9 +407,10 @@ class HornedWorkerProcess(object):
         chunks = self.app(env, start_response)
         status, headers, data = response
         if isinstance(chunks, file):
-            self.send_file(status, headers, chunks)
+            length = self.send_file(status, headers, chunks)
         else:
-            self.send_response(status, headers, chunks, data)
+            length = self.send_response(status, headers, chunks, data)
+        return status, length
 
     def finalize_request(self, connection, address):
         self.stream.close()
@@ -436,16 +437,20 @@ class HornedWorkerProcess(object):
                           offset,
                           length)
         file.close()
+        return length.value
 
     def send_response(self, status, headers, chunks, data=None):
         write = self.stream.write
+        length = 0
         for chunks in [data, chunks, [""]]:
             for chunk in chunks:
                 if not self.headers_sent:
                     self.send_headers(status, headers)
                 write(chunk)
+                length += len(chunk)
         if hasattr(chunks, "close"):
             chunks.close()
+        return length
 
 if __name__ == '__main__':
     worker = HornedManager(demo_app)
