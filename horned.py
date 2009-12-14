@@ -329,15 +329,19 @@ class HornedWorkerProcess(object):
         sys.exit(0)
 
     def report_status(self, status):
-        self.status_pipe.write(status_struct.pack(status,
-                                                  int(time.time()),
-                                                  self.requests,
-                                                  self.errors))
-
+        try:
+            self.status_pipe.write(status_struct.pack(status,
+                                                      int(time.time()),
+                                                      self.requests,
+                                                      self.errors))
+        except IOError:
+            if self.alive:
+                logging.error("Parent gone!")
+                self.alive = False
 
     def die_gracefully(self, signum, frame):
-        self.report_status(SHUTTING_DOWN)
         self.alive = False
+        self.report_status(SHUTTING_DOWN)
         os.write(self.wpipe, ".")
 
     def handle_request(self, connection, address):
