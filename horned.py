@@ -346,10 +346,17 @@ class HornedWorkerProcess(object):
         os.write(self.wpipe, ".")
 
     def handle_request(self, connection, address):
+        start = time.time()
         self.initialize_request(connection, address)
         env = self.parse_request()
         status, length = self.execute_request(self.app, env)
         self.finalize_request(connection, address)
+        finish = time.time()
+        request = "%s %s %s" % (env["REQUEST_METHOD"],
+                                env["PATH_INFO"],
+                                env["SERVER_PROTOCOL"])
+        logging.info('%s "%s" %s %s %f',
+                     address[0], request, status[:3], length, finish - start)
 
     def initialize_request(self, connection, address):
         self.stream = HornedSocket(connection)
