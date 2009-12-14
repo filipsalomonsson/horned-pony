@@ -222,6 +222,17 @@ class HornedManager(object):
             time.sleep(1)
         for worker in self.workers:
             worker.die_gracefully()
+        t = time.time()
+        while self.workers:
+            if time.time() - t > 10:
+                logging.error("%d children won't die. Exiting anyway.",
+                              len(self.children))
+                break
+            for worker in list(self.workers):
+                pid, status = worker.wait(os.WNOHANG)
+                if pid:
+                    self.workers.remove(worker)
+            time.sleep(0.1)
 
     def cleanup_workers(self):
         for worker in list(self.workers):
@@ -284,6 +295,9 @@ class HornedWorker:
     def die_gracefully(self):
         logging.info("Sending SIGINT to worker #%d" % self.pid)
         os.kill(self.pid, signal.SIGINT)
+
+    def wait(self, *options):
+        return os.waitpid(self.pid, *options)
 
 
 class HornedWorkerProcess(object):
