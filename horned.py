@@ -326,6 +326,7 @@ class HornedWorkerProcess(object):
                         logging.error("accept() interrupted")
                 finally:
                     connection.close()
+        logging.info("Shutting down")
         sys.exit(0)
 
     def report_status(self, status):
