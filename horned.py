@@ -51,15 +51,15 @@ class Logger(object):
                 self.stream = stream
 
     def error(self, msg, *args, **kwargs):
-        if self.level >= ERROR:
+        if self.level <= ERROR:
             self.write("error", msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
-        if self.level >= INFO:
+        if self.level <= INFO:
             self.write("info", msg, *args, **kwargs)
 
     def debug(self, msg, *args, **kwargs):
-        if self.level >= DEBUG:
+        if self.level <= DEBUG:
             self.write("debug", msg, *args, **kwargs)
 
     def write(self, level, msg, *args, **kwargs):
