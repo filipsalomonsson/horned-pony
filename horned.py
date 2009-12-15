@@ -31,8 +31,8 @@ except:
 
 DEBUG, INFO, ERROR = 1, 2, 3
 class Logger(object):
-    def __init__(self, stream=sys.stderr, level=INFO):
-        if isinstance(file, basestring):
+    def __init__(self, stream="test.log", level=INFO):
+        if isinstance(stream, basestring):
             self.stream = open(stream, "a", 0)
         else:
             self.stream = stream
@@ -40,7 +40,7 @@ class Logger(object):
 
     def reopen(self):
         filename = self.stream.name
-        if not name.startswith("<"):
+        if not filename.startswith("<"):
             try:
                 stream = open(filename, "a", 0)
             except IOError:
