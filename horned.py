@@ -20,14 +20,31 @@ try:
     def errcheck(ret, func, args):
         if ret == -1:
             e = get_errno_loc()[0]
-            raise OSError(os.strerror(e))
+            raise OSError(e, os.strerror(e))
         return ret
 
     sendfile = libc.sendfile
     sendfile.errcheck = errcheck
 except:
-    def sendfile(outfile, infile, offset, length):
-        pass
+    sendfile = None
+
+class FileWrapper(object):
+    def __init__(self, file, block_size=8192):
+        self.file = file
+        self.block_size = block_size
+        if hasattr(file, "close"):
+            self.close = file.close
+        if hasattr(file, "fileno"):
+            self.fileno = file.fileno
+
+    def __iter__(self):
+        while True:
+            chunk = self.file.read(self.block_size)
+            if chunk:
+                yield chunk
+            else:
+                break
+
 
 DEBUG, INFO, ERROR = 1, 2, 3
 class Logger(object):
@@ -96,6 +113,8 @@ def demo_app(environ,start_response):
 def sendfile_app(environ,start_response):
     try:
         file = open(environ.get("PATH_INFO", "")[1:])
+        if "wsgi.file_wrapper" in environ:
+            file = environ["wsgi.file_wrapper"](file)
         start_response("200 OK", [('Content-Type','text/plain')])
         return file
     except IOError:
@@ -315,6 +334,7 @@ class HornedWorkerProcess(object):
         host, port = sock.getsockname()[:2]
         env["SERVER_NAME"] = socket.getfqdn(host)
         env["SERVER_PORT"] = str(port)
+        env["wsgi.file_wrapper"] = FileWrapper
 
         signal.signal(signal.SIGINT, self.die_gracefully)
 
@@ -427,8 +447,14 @@ class HornedWorkerProcess(object):
             return data.append
         chunks = self.app(env, start_response)
         status, headers, data = response
-        if isinstance(chunks, file):
-            length = self.send_file(status, headers, chunks)
+        if sendfile is not None and isinstance(chunks, FileWrapper):
+            try:
+                length = self.send_file(status, headers, chunks)
+            except OSError, e:
+                if e.errno in (errno.EINVAL, errno.ENOSYS):
+                    length = self.send_response(status, headers, chunks, data)
+                else:
+                    raise
         else:
             length = self.send_response(status, headers, chunks, data)
         return status, length
@@ -451,7 +477,7 @@ class HornedWorkerProcess(object):
 
     def send_file(self, status, headers, file):
         self.send_headers(status, headers)
-        offset = ctypes.pointer(ctypes.c_int(0))
+        offset = None
         length = ctypes.c_int(os.fstat(file.fileno()).st_size)
         retval = sendfile(self.stream.socket.fileno(),
                           file.fileno(),
