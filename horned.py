@@ -365,7 +365,10 @@ class HornedWorkerProcess(object):
                     elif e[0] == errno.EINTR:
                         logging.error("accept() interrupted")
                 finally:
-                    connection.close()
+                    try:
+                        connection.close()
+                    except:
+                        pass
         logging.info("Shutting down")
         sys.exit(0)
 
