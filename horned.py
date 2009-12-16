@@ -234,6 +234,7 @@ class HornedManager(object):
         self.sock.listen(1024)
 
     def serve_forever(self):
+        self.listen()
         while self.alive:
             self.cleanup_workers()
             self.spawn_workers()
@@ -510,6 +511,5 @@ class HornedWorkerProcess(object):
 
 if __name__ == '__main__':
     worker = HornedManager(demo_app)
-    worker.listen()
     worker.serve_forever()
 
