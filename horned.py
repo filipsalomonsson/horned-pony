@@ -338,6 +338,7 @@ class HornedWorkerProcess(object):
         env["wsgi.file_wrapper"] = FileWrapper
 
         signal.signal(signal.SIGINT, self.die_gracefully)
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
     def serve_forever(self):
         while self.alive:
