@@ -342,10 +342,16 @@ class HornedWorkerProcess(object):
         while self.alive:
             self.report_status(WAITING)
             try:
-                socks, _, _ = select.select([self.sock, self.rpipe], [], [])
+                socks, _, _ = select.select([self.sock, self.rpipe],
+                                            [self.status_pipe],
+                                            [],
+                                            5)
             except select.error, e:
                 if e[0] == errno.EINTR:
                     continue
+                elif e[0] == errno.EBADF:
+                    logging.error("select() returned EBADF.")
+                    break
             for sock in socks:
                 self.report_status(PROCESSING)
                 try:
