@@ -234,12 +234,15 @@ class HornedManager(object):
         self.sock.listen(1024)
 
     def serve_forever(self):
+        logging.info("Manager up and running; opening socket.", pid=True)
         self.listen()
+        logging.info("Entering main loop.", pid=True)
         while self.alive:
             self.cleanup_workers()
             self.spawn_workers()
             self.update_status()
             time.sleep(1)
+        logging.info("Reaping workers...", pid=True)
         for worker in self.workers:
             worker.die_gracefully()
         t = time.time()
@@ -253,6 +256,7 @@ class HornedManager(object):
                 if pid:
                     self.workers.remove(worker)
             time.sleep(0.1)
+        logging.info("Manager done. Exiting.", pid=True)
 
     def cleanup_workers(self):
         for worker in list(self.workers):
@@ -263,6 +267,7 @@ class HornedManager(object):
 
     def spawn_workers(self):
         while len(self.workers) < self.worker_processes:
+            logging.info("Spawning new worker.", pid=True)
             worker = HornedWorker(self.sock, self.app)
             self.workers.add(worker)
             worker.run()
@@ -280,6 +285,7 @@ class HornedManager(object):
                  worker.errors)
 
     def die_gracefully(self, signum, frame):
+        logging.info("Manager shutting down gracefully...", pid=True)
         self.alive = False
 
 
@@ -341,6 +347,7 @@ class HornedWorkerProcess(object):
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
     def serve_forever(self):
+        logging.info("Worker up and running.", pid=True)
         while self.alive:
             self.report_status(WAITING)
             try:
@@ -371,7 +378,7 @@ class HornedWorkerProcess(object):
                         connection.close()
                     except:
                         pass
-        logging.info("Shutting down", pid=True)
+        logging.info("Worker shutting down", pid=True)
         sys.exit(0)
 
     def report_status(self, status):
