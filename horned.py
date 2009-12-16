@@ -83,7 +83,7 @@ class Logger(object):
        timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
        line = "%s %s" % (timestamp, msg % args)
        if "pid" in kwargs:
-           prefix = "(#%d) " % kwargs["pid"]
+           prefix = "(#%d) " % os.getpid()
            line = prefix + line
        self._write(line)
 
@@ -245,7 +245,7 @@ class HornedManager(object):
         while self.workers:
             if time.time() - t > 10:
                 logging.error("%d children won't die. Exiting anyway.",
-                              len(self.children))
+                              len(self.children), pid=True)
                 break
             for worker in list(self.workers):
                 pid, status = worker.wait(os.WNOHANG)
@@ -258,7 +258,7 @@ class HornedManager(object):
             pid, status = os.waitpid(worker.pid, os.WNOHANG)
             if pid:
                 self.workers.remove(worker)
-                logging.info("Worker #%d died" % pid)
+                logging.info("Worker #%d died" % pid, pid=True)
 
     def spawn_workers(self):
         while len(self.workers) < self.worker_processes:
@@ -299,7 +299,7 @@ class HornedWorker:
         pid = os.fork()
         if pid:
             self.wpipe.close()
-            logging.info("Spawned worker #%d" % pid)
+            logging.info("Spawned worker #%d" % pid, pid=True)
             self.pid = pid
         else:
             self.rpipe.close()
@@ -312,7 +312,7 @@ class HornedWorker:
             (self.status, self.timestamp, self.requests, self.errors) = data
 
     def die_gracefully(self):
-        logging.info("Sending SIGINT to worker #%d" % self.pid)
+        logging.info("Sending SIGINT to worker #%d" % self.pid, pid=True)
         os.kill(self.pid, signal.SIGINT)
 
     def wait(self, *options):
@@ -350,7 +350,7 @@ class HornedWorkerProcess(object):
                 if e[0] == errno.EINTR:
                     continue
                 elif e[0] == errno.EBADF:
-                    logging.error("select() returned EBADF.")
+                    logging.error("select() returned EBADF.", pid=True)
                     break
             for sock in socks:
                 self.report_status(PROCESSING)
@@ -361,15 +361,15 @@ class HornedWorkerProcess(object):
                 except socket.error, e:
                     self.errors += 1
                     if e[0] == errno.EPIPE:
-                        logging.error("Broken pipe")
+                        logging.error("Broken pipe", pid=True)
                     elif e[0] == errno.EINTR:
-                        logging.error("accept() interrupted")
+                        logging.error("accept() interrupted", pid=True)
                 finally:
                     try:
                         connection.close()
                     except:
                         pass
-        logging.info("Shutting down")
+        logging.info("Shutting down", pid=True)
         sys.exit(0)
 
     def report_status(self, status):
@@ -380,7 +380,7 @@ class HornedWorkerProcess(object):
                                                       self.errors))
         except IOError:
             if self.alive:
-                logging.error("Parent gone!")
+                logging.error("Parent gone!", pid=True)
                 self.alive = False
 
     def die_gracefully(self, signum, frame):
