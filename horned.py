@@ -198,7 +198,7 @@ class HornedManager(object):
         self.workers = set()
         self.alive = True
 
-        signal.signal(signal.SIGINT, self.die_gracefully)
+        signal.signal(signal.SIGQUIT, self.die_gracefully)
         signal.signal(signal.SIGHUP, self.report_status)
 
     def listen(self, address="127.0.0.1", port=8080):
@@ -293,8 +293,8 @@ class HornedWorker:
             (self.status, self.timestamp, self.requests, self.errors) = data
 
     def die_gracefully(self):
-        logging.info("Sending SIGINT to worker #%d" % self.pid, pid=True)
-        os.kill(self.pid, signal.SIGINT)
+        logging.info("Sending SIGQUIT to worker #%d" % self.pid, pid=True)
+        os.kill(self.pid, signal.SIGQUIT)
 
     def wait(self, *options):
         return os.waitpid(self.pid, *options)
@@ -316,7 +316,7 @@ class HornedWorkerProcess(object):
         env["SERVER_NAME"] = socket.gethostname()
         env["SERVER_PORT"] = str(port)
 
-        signal.signal(signal.SIGINT, self.die_gracefully)
+        signal.signal(signal.SIGQUIT, self.die_gracefully)
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
     def serve_forever(self):
