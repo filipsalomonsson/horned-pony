@@ -199,6 +199,8 @@ class HornedManager(object):
         self.alive = True
 
         signal.signal(signal.SIGQUIT, self.die_gracefully)
+        signal.signal(signal.SIGINT, self.die_immediately)
+        signal.signal(signal.SIGTERM, self.die_immediately)
         signal.signal(signal.SIGHUP, self.report_status)
 
     def listen(self, address="127.0.0.1", port=8080):
@@ -262,6 +264,11 @@ class HornedManager(object):
         logging.info("Manager shutting down gracefully...", pid=True)
         self.alive = False
 
+    def die_immediately(self, signum, frame):
+        for worker in list(self.workers):
+            worker.die_immediately()
+        sys.exit(0)
+
 
 class HornedWorker:
     def __init__(self, sock, app):
@@ -296,6 +303,10 @@ class HornedWorker:
         logging.info("Sending SIGQUIT to worker #%d" % self.pid, pid=True)
         os.kill(self.pid, signal.SIGQUIT)
 
+    def die_immediately(self):
+        logging.info("Sending SIGTERM to worker #%d" % self.pid, pid=True)
+        os.kill(self.pid, signal.SIGTERM)
+
     def wait(self, *options):
         return os.waitpid(self.pid, *options)
 
@@ -317,6 +328,8 @@ class HornedWorkerProcess(object):
         env["SERVER_PORT"] = str(port)
 
         signal.signal(signal.SIGQUIT, self.die_gracefully)
+        signal.signal(signal.SIGINT, self.die_immediately)
+        signal.signal(signal.SIGTERM, self.die_immediately)
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
     def serve_forever(self):
@@ -369,6 +382,9 @@ class HornedWorkerProcess(object):
         self.alive = False
         self.report_status(SHUTTING_DOWN)
         os.write(self.wpipe, ".")
+
+    def die_immediately(self, signum, frame):
+        sys.exit(0)
 
     def handle_request(self, connection, address):
         start = time.time()
