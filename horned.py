@@ -334,10 +334,10 @@ class HornedWorkerProcess(object):
                 elif e[0] == errno.EBADF:
                     logging.error("select() returned EBADF.", pid=True)
                     break
-            for sock in socks:
+            if self.sock in socks:
                 self.report_status(PROCESSING)
                 try:
-                    connection, address = sock.accept()
+                    connection, address = self.sock.accept()
                     self.handle_request(connection, address)
                     self.requests += 1
                 except socket.error, e:
