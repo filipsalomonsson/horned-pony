@@ -4,7 +4,7 @@
 import os
 import sys
 import time
-import socket
+import _socket as socket
 import select
 import signal
 import errno
@@ -295,7 +295,7 @@ class HornedWorkerProcess(object):
 
         env = self.baseenv = os.environ.copy()
         host, port = sock.getsockname()[:2]
-        env["SERVER_NAME"] = socket.getfqdn(host)
+        env["SERVER_NAME"] = socket.gethostname()
         env["SERVER_PORT"] = str(port)
 
         signal.signal(signal.SIGINT, self.die_gracefully)
