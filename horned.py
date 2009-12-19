@@ -9,7 +9,6 @@ import select
 import signal
 import errno
 import struct
-from cStringIO import StringIO
 
 
 DEBUG, INFO, ERROR = 1, 2, 3
