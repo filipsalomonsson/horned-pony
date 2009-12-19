@@ -201,10 +201,10 @@ class HornedManager(object):
         signal.signal(signal.SIGINT, self.die_gracefully)
         signal.signal(signal.SIGHUP, self.report_status)
 
-    def listen(self):
+    def listen(self, address="127.0.0.1", port=8080):
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(('', 6666))
+        self.sock.bind((address, port))
         self.sock.listen(1024)
 
     def serve_forever(self):
