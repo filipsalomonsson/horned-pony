@@ -63,6 +63,9 @@ class Logger(object):
         if self.level <= DEBUG:
             self.write("debug", msg, *args, **kwargs)
 
+    def request(self, client, request, status, length, time):
+        self.info('%s "%s" %s %s %f', client, request, status, length, time)
+
     def write(self, level, msg, *args, **kwargs):
        timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
        line = "%s %s" % (timestamp, msg % args)
@@ -396,8 +399,7 @@ class HornedWorkerProcess(object):
         request = "%s %s %s" % (env["REQUEST_METHOD"],
                                 env["PATH_INFO"],
                                 env["SERVER_PROTOCOL"])
-        logging.info('%s "%s" %s %s %f',
-                     address[0], request, status[:3], length, finish - start)
+        logging.request(address[0], request, status[:3], length, finish - start)
 
     def initialize_request(self, connection, address):
         self.stream = HornedSocket(connection)
