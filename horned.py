@@ -389,7 +389,7 @@ class HornedWorkerProcess(object):
 
         env["wsgi.version"] = (1, 0)
         env["wsgi.url_scheme"] = "http"
-        env["wsgi.input"] = self.stream.socket.makefile("rb", -1)
+        env["wsgi.input"] = self.stream
         env["wsgi.errors"] = sys.stderr
         env["wsgi.multithread"] = False
         env["wsgi.multiprocess"] = True
