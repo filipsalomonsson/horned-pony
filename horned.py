@@ -76,16 +76,6 @@ def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/html')])
     return ["<html><body><h1>Hello world!</h1></body></html>\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
 
-def sendfile_app(environ,start_response):
-    try:
-        file = open(environ.get("PATH_INFO", "")[1:])
-        if "wsgi.file_wrapper" in environ:
-            file = environ["wsgi.file_wrapper"](file)
-        start_response("200 OK", [('Content-Type','text/plain')])
-        return file
-    except IOError:
-        start_response("404 Not Found", [('Content-Type', 'text/plain')])
-        return ["Could not open %s." % environ.get("PATH_INFO")]
 
 status_struct = struct.Struct("bqqq")
 STARTING = 1
