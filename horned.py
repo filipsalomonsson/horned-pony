@@ -30,6 +30,33 @@ import errno
 import struct
 
 
+class Logfile(object):
+    def __init__(self, filename):
+        if isinstance(filename, basestring):
+            self.filename = filename
+        else:
+            self.filename = None
+            self.file = filename
+        self.reopen()
+
+    def write(self, data):
+        self.file.write(data)
+
+    def flush(self):
+        self.file.flush()
+
+    def reopen(self):
+        if not self.filename:
+            return False
+        try:
+            new_file = open(self.filename, "a", 0)
+        except:
+            return False
+        else:
+            self.file = new_file
+            return True
+
+
 DEBUG, INFO, ERROR = 1, 2, 3
 class Logger(object):
     def __init__(self, stream="test.log", level=INFO):
