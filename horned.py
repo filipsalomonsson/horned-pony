@@ -224,6 +224,10 @@ class HornedManager(object):
         self.worker_processes = self.config.get("worker_processes")
         self.app = self.config.get("app")
 
+        global logging
+        logging = Logger(self.config.get("access_log"),
+                         self.config.get("error_log"))
+
         self.base_environ = {}
         self.workers = set()
         self.alive = True
