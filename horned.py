@@ -210,10 +210,20 @@ class HornedSocket(object):
         return line
 
 
+DEFAULT_CONFIG = dict(app=demo_app,
+                      address=("127.0.0.1", 8080),
+                      worker_processes=4,
+                      access_log="/dev/stdout",
+                      error_log="/dev/stderr")
+
 class HornedManager(object):
-    def __init__(self, app, worker_processes=4):
-        self.app = app
-        self.worker_processes = worker_processes
+    def __init__(self, config):
+        self.config = DEFAULT_CONFIG.copy()
+        self.config.update(config)
+
+        self.worker_processes = self.config.get("worker_processes")
+        self.app = self.config.get("app")
+
         self.base_environ = {}
         self.workers = set()
         self.alive = True
@@ -226,7 +236,7 @@ class HornedManager(object):
     def listen(self, address="127.0.0.1", port=8080):
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((address, port))
+        self.sock.bind(self.config.get("address"))
         self.sock.listen(1024)
 
     def serve_forever(self):
@@ -506,6 +516,12 @@ class HornedWorkerProcess(object):
         return length
 
 if __name__ == '__main__':
-    worker = HornedManager(demo_app)
-    worker.serve_forever()
+    hello_world = dict(app=demo_app,
+                       address=("127.0.0.1", 8080),
+                       worker_processes=4,
+                       access_log="access_log",
+                       error_log="error_log")
+    
+    HornedManager(hello_world).serve_forever()
+
 
