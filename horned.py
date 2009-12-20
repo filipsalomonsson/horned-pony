@@ -64,9 +64,12 @@ class Logger(object):
         self.stderr = Logfile(stderr)
         self.level = level
 
-    def reopen(self):
-        self.stdout.reopen()
-        self.stderr.reopen()
+    def reopen(self, *args, **kwargs):
+        logging.info("Reopening log files", pid=True)
+        if not self.stdout.reopen():
+            self.error("Could not reopen stdout", pid=True)
+        if not self.stderr.reopen():
+            self.error("Could not reopen stderr", pid=True)
 
     def error(self, msg, *args, **kwargs):
         if self.level <= ERROR:
