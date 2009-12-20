@@ -59,24 +59,14 @@ class Logfile(object):
 
 DEBUG, INFO, ERROR = 1, 2, 3
 class Logger(object):
-    def __init__(self, stream="test.log", level=INFO):
-        if isinstance(stream, basestring):
-            self.stream = open(stream, "a", 0)
-        else:
-            self.stream = stream
+    def __init__(self, stdout=sys.stdout, stderr=sys.stderr, level=INFO):
+        self.stdout = Logfile(stdout)
+        self.stderr = Logfile(stderr)
         self.level = level
 
     def reopen(self):
-        filename = self.stream.name
-        if not filename.startswith("<"):
-            try:
-                stream = open(filename, "a", 0)
-            except IOError:
-                self.error("Couldn't reopen log file %s; leaving open.",
-                           filename)
-            else:
-                self.stream.close()
-                self.stream = stream
+        self.stdout.reopen()
+        self.stderr.reopen()
 
     def error(self, msg, *args, **kwargs):
         if self.level <= ERROR:
@@ -102,8 +92,8 @@ class Logger(object):
        self._write(line)
 
     def _write(self, data):
-        self.stream.write(data + "\n")
-        self.stream.flush()
+        self.stderr.write(data + "\n")
+        self.stderr.flush()
 
 logging = Logger()
 
