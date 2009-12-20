@@ -217,8 +217,8 @@ class HornedSocket(object):
 DEFAULT_CONFIG = dict(app=demo_app,
                       address=("127.0.0.1", 8080),
                       worker_processes=4,
-                      access_log="/dev/stdout",
-                      error_log="/dev/stderr")
+                      access_log=sys.stdout,
+                      error_log=sys.stderr)
 
 class HornedManager(object):
     def __init__(self, config):
