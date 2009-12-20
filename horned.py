@@ -239,6 +239,7 @@ class HornedManager(object):
         signal.signal(signal.SIGINT, self.die_immediately)
         signal.signal(signal.SIGTERM, self.die_immediately)
         signal.signal(signal.SIGHUP, self.report_status)
+        signal.signal(signal.SIGUSR1, logging.reopen)
 
     def listen(self, address="127.0.0.1", port=8080):
         self.sock = socket.socket()
