@@ -115,7 +115,8 @@ def urlunquote(quoted):
 
 def demo_app(environ,start_response):
     start_response("200 OK", [('Content-Type','text/html')])
-    return ["<html><body><h1>Hello world!</h1></body></html>\n\n"]# + ["%s=%s\n" % item for item in sorted(environ.items())]
+    return ["<html><head><title>Hello world!</title></head>"
+            "<body><h1>Hello world!</h1></body></html>\n\n"]
 
 
 status_struct = struct.Struct("bqqq")
