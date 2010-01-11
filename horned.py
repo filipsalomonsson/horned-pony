@@ -181,6 +181,10 @@ class HornedSocket(object):
     def write(self, data):
         self.write_buffer += data
 
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
     def flush(self):
         self.socket.sendall(self.write_buffer)
         self.write_buffer = ""
