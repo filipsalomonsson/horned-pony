@@ -131,7 +131,7 @@ def http_date(timestamp=None):
          hour, minute, second)
 
 
-class HornedSocket(object):
+class IOStream(object):
     def __init__(self, socket):
         self.socket = socket
         self.read_buffer = ""
@@ -384,7 +384,7 @@ class HornedWorkerProcess(object):
         logging.request(address[0], request, status[:3], length, finish - start)
 
     def initialize_request(self, connection, address):
-        self.stream = HornedSocket(connection)
+        self.stream = IOStream(connection)
         self.client_address = address
         self.headers_sent = False
 
