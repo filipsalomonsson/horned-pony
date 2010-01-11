@@ -118,22 +118,6 @@ def demo_app(environ,start_response):
     return ["<html><head><title>Hello world!</title></head>"
             "<body><h1>Hello world!</h1></body></html>\n\n"]
 
-
-status_struct = struct.Struct("bqqq")
-STARTING = 1
-WAITING = 2
-PROCESSING = 3
-SHUTTING_DOWN = 4
-DEAD = 5
-
-STATUS = {
-    STARTING: "starting",
-    WAITING: "waiting",
-    PROCESSING: "processing",
-    SHUTTING_DOWN: "shutting down",
-    DEAD: "dead",
-}
-
 HTTP_WDAY = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 HTTP_MONTH = (None, "Jan", "Feb", "Mar", "Apr", "May", "Jun",
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
@@ -239,7 +223,6 @@ class HornedManager(object):
         signal.signal(signal.SIGQUIT, self.die_gracefully)
         signal.signal(signal.SIGINT, self.die_immediately)
         signal.signal(signal.SIGTERM, self.die_immediately)
-        signal.signal(signal.SIGHUP, self.report_status)
         signal.signal(signal.SIGUSR1, logging.reopen)
 
     def listen(self, address="127.0.0.1", port=8080):
@@ -255,7 +238,6 @@ class HornedManager(object):
         while self.alive:
             self.cleanup_workers()
             self.spawn_workers()
-            self.update_status()
             time.sleep(1)
         logging.info("Reaping workers...", pid=True)
         for worker in self.workers:
@@ -287,18 +269,6 @@ class HornedManager(object):
             self.workers.add(worker)
             worker.run()
 
-    def update_status(self):
-        for worker in self.workers:
-            worker.update_status()
-
-    def report_status(self, *args):
-        for worker in self.workers:
-            print "Worker #%d: %s. %d requests, %d errors" % \
-                (worker.pid,
-                 STATUS.get(worker.status, "unknown"),
-                 worker.requests,
-                 worker.errors)
-
     def die_gracefully(self, signum, frame):
         logging.info("Manager shutting down gracefully...", pid=True)
         self.alive = False
@@ -314,29 +284,16 @@ class HornedWorker:
         self.sock = sock
         self.app = app
         self.pid = None
-        self.status = STARTING
         self.timestamp = int(time.time())
         self.requests = self.errors = 0
-
-        r, w = os.pipe()
-        self.rpipe = os.fdopen(r, "r", 0)
-        self.wpipe = os.fdopen(w, "w", 0)
 
     def run(self):
         pid = os.fork()
         if pid:
-            self.wpipe.close()
             logging.info("Spawned worker #%d" % pid, pid=True)
             self.pid = pid
         else:
-            self.rpipe.close()
-            HornedWorkerProcess(self.sock, self.app, self.wpipe).serve_forever()
-
-    def update_status(self):
-        while select.select([self.rpipe], [], [], 0)[0]:
-            data = self.rpipe.read(status_struct.size)
-            data = status_struct.unpack(data)
-            (self.status, self.timestamp, self.requests, self.errors) = data
+            HornedWorkerProcess(self.sock, self.app).serve_forever()
 
     def die_gracefully(self):
         logging.info("Sending SIGQUIT to worker #%d" % self.pid, pid=True)
@@ -351,10 +308,9 @@ class HornedWorker:
 
 
 class HornedWorkerProcess(object):
-    def __init__(self, sock, app, status_pipe):
+    def __init__(self, sock, app):
         self.sock = sock
         self.app = app
-        self.status_pipe = status_pipe
         self.alive = True
         self.requests = 0
         self.errors = 0
@@ -374,10 +330,9 @@ class HornedWorkerProcess(object):
     def serve_forever(self):
         logging.info("Worker up and running.", pid=True)
         while self.alive:
-            self.report_status(WAITING)
             try:
                 socks, _, _ = select.select([self.sock, self.rpipe],
-                                            [self.status_pipe],
+                                            [],
                                             [],
                                             5)
             except select.error, e:
@@ -387,7 +342,6 @@ class HornedWorkerProcess(object):
                     logging.error("select() returned EBADF.", pid=True)
                     break
             if self.sock in socks:
-                self.report_status(PROCESSING)
                 try:
                     connection, address = self.sock.accept()
                     self.handle_request(connection, address)
@@ -406,20 +360,8 @@ class HornedWorkerProcess(object):
         logging.info("Worker shutting down", pid=True)
         sys.exit(0)
 
-    def report_status(self, status):
-        try:
-            self.status_pipe.write(status_struct.pack(status,
-                                                      int(time.time()),
-                                                      self.requests,
-                                                      self.errors))
-        except IOError:
-            if self.alive:
-                logging.error("Parent gone!", pid=True)
-                self.alive = False
-
     def die_gracefully(self, signum, frame):
         self.alive = False
-        self.report_status(SHUTTING_DOWN)
         os.write(self.wpipe, ".")
 
     def die_immediately(self, signum, frame):
