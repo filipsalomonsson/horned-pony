@@ -318,7 +318,6 @@ class HornedWorkerProcess(object):
         self.alive = True
         self.requests = 0
         self.errors = 0
-
         self.rpipe, self.wpipe = os.pipe()
 
         env = self.baseenv = os.environ.copy()
@@ -344,9 +343,7 @@ class HornedWorkerProcess(object):
         while self.alive:
             try:
                 socks, _, _ = select.select([self.sock, self.rpipe],
-                                            [],
-                                            [],
-                                            5)
+                                            [], [], 5)
             except select.error, e:
                 if e[0] == errno.EINTR:
                     continue
@@ -399,24 +396,20 @@ class HornedWorkerProcess(object):
         method, path, protocol = reqline.split(" ", 2)
 
         env = self.baseenv.copy()
-
         env["REQUEST_METHOD"] = method
         env["REMOTE_ADDR"] = client_address[0]
         if "?" in path:
             path, _, query = path.partition("?")
             env["QUERY_STRING"] = query
         env["PATH_INFO"] = urlunquote(path)
-
         env["wsgi.input"] = self.stream
 
         for line in lines[1:]:
-            if not line:
-                break
+            if not line: break
             key, _, value = line.partition(":")
             key = key.replace("-", "_").upper()
             value = value.strip()
             env["HTTP_" + key] = value
-
         return env
 
     def execute_request(self, app, env):
