@@ -385,14 +385,11 @@ class HornedWorkerProcess(object):
         start = time.time()
         self.stream = IOStream(connection)
         self.headers_sent = False
-        env = self.parse_request(address)
+        reqline, env = self.parse_request(address)
         status, length = self.execute_request(self.app, env)
         self.stream.close()
         finish = time.time()
-        request = "%s %s %s" % (env["REQUEST_METHOD"],
-                                env["PATH_INFO"],
-                                env["SERVER_PROTOCOL"])
-        logging.request(address[0], request, status[:3], length, finish - start)
+        logging.request(address[0], reqline, status[:3], length, finish - start)
 
     def parse_request(self, client_address):
         header_data = self.stream.read_until("\r\n\r\n")
@@ -416,7 +413,7 @@ class HornedWorkerProcess(object):
             key = key.replace("-", "_").upper()
             value = value.strip()
             env["HTTP_" + key] = value
-        return env
+        return reqline, env
 
     def execute_request(self, app, env):
         data = []
