@@ -65,7 +65,7 @@ class Logger(object):
         self.level = level
 
     def reopen(self, *args, **kwargs):
-        logging.info("Reopening log files", pid=True)
+        log.info("Reopening log files", pid=True)
         if not self.stdout.reopen():
             self.error("Could not reopen stdout", pid=True)
         if not self.stderr.reopen():
@@ -104,7 +104,7 @@ class Logger(object):
         self.stderr.write(data + "\n")
         self.stderr.flush()
 
-logging = Logger()
+log = Logger()
 
 charfromhex = {}
 for i in xrange(256):
@@ -222,8 +222,8 @@ class HornedManager(object):
         self.worker_processes = self.config.get("worker_processes")
         self.app = self.config.get("app")
 
-        global logging
-        logging = Logger(self.config.get("access_log"),
+        global log
+        log = Logger(self.config.get("access_log"),
                          self.config.get("error_log"))
 
         self.base_environ = {}
@@ -233,7 +233,7 @@ class HornedManager(object):
         signal.signal(signal.SIGQUIT, self.die_gracefully)
         signal.signal(signal.SIGINT, self.die_immediately)
         signal.signal(signal.SIGTERM, self.die_immediately)
-        signal.signal(signal.SIGUSR1, logging.reopen)
+        signal.signal(signal.SIGUSR1, log.reopen)
 
     def listen(self, address="127.0.0.1", port=8080):
         self.sock = socket.socket()
@@ -242,20 +242,20 @@ class HornedManager(object):
         self.sock.listen(1024)
 
     def serve_forever(self):
-        logging.info("Manager up and running; opening socket.", pid=True)
+        log.info("Manager up and running; opening socket.", pid=True)
         self.listen()
-        logging.info("Entering main loop.", pid=True)
+        log.info("Entering main loop.", pid=True)
         while self.alive:
             self.cleanup_workers()
             self.spawn_workers()
             time.sleep(1)
-        logging.info("Reaping workers...", pid=True)
+        log.info("Reaping workers...", pid=True)
         for worker in self.workers:
             worker.die_gracefully()
         t = time.time()
         while self.workers:
             if time.time() - t > 10:
-                logging.error("%d children won't die. Exiting anyway.",
+                log.error("%d children won't die. Exiting anyway.",
                               len(self.children), pid=True)
                 break
             for worker in list(self.workers):
@@ -263,24 +263,24 @@ class HornedManager(object):
                 if pid:
                     self.workers.remove(worker)
             time.sleep(0.1)
-        logging.info("Manager done. Exiting.", pid=True)
+        log.info("Manager done. Exiting.", pid=True)
 
     def cleanup_workers(self):
         for worker in list(self.workers):
             pid, status = os.waitpid(worker.pid, os.WNOHANG)
             if pid:
                 self.workers.remove(worker)
-                logging.info("Worker #%d died" % pid, pid=True)
+                log.info("Worker #%d died" % pid, pid=True)
 
     def spawn_workers(self):
         while len(self.workers) < self.worker_processes:
-            logging.info("Spawning new worker.", pid=True)
+            log.info("Spawning new worker.", pid=True)
             worker = HornedWorker(self.sock, self.app)
             self.workers.add(worker)
             worker.run()
 
     def die_gracefully(self, signum, frame):
-        logging.info("Manager shutting down gracefully...", pid=True)
+        log.info("Manager shutting down gracefully...", pid=True)
         self.alive = False
 
     def die_immediately(self, signum, frame):
@@ -300,17 +300,17 @@ class HornedWorker:
     def run(self):
         pid = os.fork()
         if pid:
-            logging.info("Spawned worker #%d" % pid, pid=True)
+            log.info("Spawned worker #%d" % pid, pid=True)
             self.pid = pid
         else:
             HornedWorkerProcess(self.sock, self.app).serve_forever()
 
     def die_gracefully(self):
-        logging.info("Sending SIGQUIT to worker #%d" % self.pid, pid=True)
+        log.info("Sending SIGQUIT to worker #%d" % self.pid, pid=True)
         os.kill(self.pid, signal.SIGQUIT)
 
     def die_immediately(self):
-        logging.info("Sending SIGTERM to worker #%d" % self.pid, pid=True)
+        log.info("Sending SIGTERM to worker #%d" % self.pid, pid=True)
         os.kill(self.pid, signal.SIGTERM)
 
     def wait(self, *options):
@@ -344,7 +344,7 @@ class HornedWorkerProcess(object):
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
     def serve_forever(self):
-        logging.info("Worker up and running.", pid=True)
+        log.info("Worker up and running.", pid=True)
         while self.alive:
             try:
                 socks, _, _ = select.select([self.sock, self.rpipe],
@@ -353,7 +353,7 @@ class HornedWorkerProcess(object):
                 if e[0] == errno.EINTR:
                     continue
                 elif e[0] == errno.EBADF:
-                    logging.error("select() returned EBADF.", pid=True)
+                    log.error("select() returned EBADF.", pid=True)
                     break
             if self.sock in socks:
                 try:
@@ -363,15 +363,15 @@ class HornedWorkerProcess(object):
                 except socket.error, e:
                     self.errors += 1
                     if e[0] == errno.EPIPE:
-                        logging.error("Broken pipe", pid=True)
+                        log.error("Broken pipe", pid=True)
                     elif e[0] == errno.EINTR:
-                        logging.error("accept() interrupted", pid=True)
+                        log.error("accept() interrupted", pid=True)
                 finally:
                     try:
                         connection.close()
                     except:
                         pass
-        logging.info("Worker shutting down", pid=True)
+        log.info("Worker shutting down", pid=True)
         sys.exit(0)
 
     def die_gracefully(self, signum, frame):
@@ -389,7 +389,7 @@ class HornedWorkerProcess(object):
         status, length = self.execute_request(self.app, env)
         self.stream.close()
         finish = time.time()
-        logging.request(address[0], reqline, status[:3], length, finish - start)
+        log.request(address[0], reqline, status[:3], length, finish - start)
 
     def parse_request(self, client_address):
         header_data = self.stream.read_until("\r\n\r\n")
