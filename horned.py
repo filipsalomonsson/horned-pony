@@ -221,7 +221,7 @@ class HornedManager(object):
 
         global log
         log = Logger(self.config.get("access_log"),
-                         self.config.get("error_log"))
+                     self.config.get("error_log"))
 
         self.base_environ = {}
         self.workers = set()
