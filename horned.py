@@ -83,8 +83,14 @@ class Logger(object):
         if self.level <= DEBUG:
             self.write("debug", msg, *args, **kwargs)
 
-    def request(self, client, request, status, length, time):
-        self.info('%s "%s" %s %s %f', client, request, status, length, time)
+    def request(self, client, request, status, length, reqtime=None):
+        now = time.gmtime()
+        timestamp = time.strftime("%m/%%s/%Y:%H:%M:%S +0000", now)
+        timestamp = timestamp % (HTTP_MONTH[now[1]])
+        line = ('%s - - [%s] "%s" %s %d "-" "-"\n'
+                % (client, timestamp, request, status, length))
+        self.stdout.write(line)
+        self.stdout.flush()
 
     def write(self, level, msg, *args, **kwargs):
        timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
