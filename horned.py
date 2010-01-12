@@ -93,12 +93,12 @@ class Logger(object):
         self.stdout.flush()
 
     def write(self, level, msg, *args, **kwargs):
-       timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
-       line = "%s %s" % (timestamp, msg % args)
-       if "pid" in kwargs:
-           prefix = "(#%d) " % os.getpid()
-           line = prefix + line
-       self._write(line)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+        line = "%s %s" % (timestamp, msg % args)
+        if "pid" in kwargs:
+            prefix = "(#%d) " % os.getpid()
+            line = prefix + line
+        self._write(line)
 
     def _write(self, data):
         self.stderr.write(data + "\n")
