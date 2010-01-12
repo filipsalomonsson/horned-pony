@@ -98,9 +98,6 @@ class Logger(object):
         if "pid" in kwargs:
             prefix = "(#%d) " % os.getpid()
             line = prefix + line
-        self._write(line)
-
-    def _write(self, data):
         self.stderr.write(data + "\n")
         self.stderr.flush()
 
