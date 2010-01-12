@@ -338,7 +338,6 @@ class HornedWorkerProcess(object):
         signal.signal(signal.SIGQUIT, self.die_gracefully)
         signal.signal(signal.SIGINT, self.die_immediately)
         signal.signal(signal.SIGTERM, self.die_immediately)
-        signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
     def serve_forever(self):
         log.info("Worker up and running.", pid=True)
