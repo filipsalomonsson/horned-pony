@@ -94,10 +94,9 @@ class Logger(object):
 
     def write(self, level, msg, *args, **kwargs):
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
-        line = "%s %s\n" % (timestamp, msg % args)
         if "pid" in kwargs:
-            prefix = "(#%d) " % os.getpid()
-            line = prefix + line
+            msg = "(#%d) %s" % (os.getpid(), msg)
+        line = "%s %s\n" % (timestamp, msg % args)
         self.stderr.write(line)
         self.stderr.flush()
 
@@ -239,9 +238,9 @@ class HornedManager(object):
         self.sock.listen(1024)
 
     def serve_forever(self):
-        log.info("Manager up and running; opening socket.", pid=True)
+        log.info("Starting manager...", pid=True)
         self.listen()
-        log.info("Entering main loop.", pid=True)
+        log.info("Fired up; ready to go!", pid=True)
         while self.alive:
             self.cleanup_workers()
             self.spawn_workers()
@@ -252,7 +251,7 @@ class HornedManager(object):
         t = time.time()
         while self.workers:
             if time.time() - t > 10:
-                log.error("%d children won't die. Exiting anyway.",
+                log.error("%d children won't die.",
                               len(self.children), pid=True)
                 break
             for worker in list(self.workers):
@@ -267,11 +266,10 @@ class HornedManager(object):
             pid, status = os.waitpid(worker.pid, os.WNOHANG)
             if pid:
                 self.workers.remove(worker)
-                log.info("Worker #%d died" % pid, pid=True)
+                log.info("Worker #%d died." % pid, pid=True)
 
     def spawn_workers(self):
         while len(self.workers) < self.worker_processes:
-            log.info("Spawning new worker.", pid=True)
             worker = HornedWorker(self.sock, self.app)
             self.workers.add(worker)
             worker.run()
@@ -281,8 +279,10 @@ class HornedManager(object):
         self.alive = False
 
     def die_immediately(self, signum, frame):
+        log.info("Immediate death requested...")
         for worker in list(self.workers):
             worker.die_immediately()
+        log.info("Bye.")
         sys.exit(0)
 
 
@@ -297,7 +297,7 @@ class HornedWorker:
     def run(self):
         pid = os.fork()
         if pid:
-            log.info("Spawned worker #%d" % pid, pid=True)
+            log.info("Spawned worker #%d." % pid, pid=True)
             self.pid = pid
         else:
             HornedWorkerProcess(self.sock, self.app).serve_forever()
@@ -340,7 +340,7 @@ class HornedWorkerProcess(object):
         signal.signal(signal.SIGTERM, self.die_immediately)
 
     def serve_forever(self):
-        log.info("Worker up and running.", pid=True)
+        log.info("Fired up; ready to go!", pid=True)
         while self.alive:
             try:
                 socks, _, _ = select.select([self.sock, self.rpipe],
