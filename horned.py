@@ -330,7 +330,6 @@ class HornedWorkerProcess(object):
         host, port = sock.getsockname()[:2]
         env.update({"SERVER_NAME": socket.gethostname(),
                     "SERVER_PORT": str(port), 
-                    "SERVER_PROTOCOL": "http", 
                     "SCRIPT_NAME": "", 
                     "wsgi.version": (1, 0), 
                     "wsgi.url_scheme": "http", 
@@ -403,6 +402,7 @@ class HornedWorkerProcess(object):
 
         env = self.baseenv.copy()
         env["REQUEST_METHOD"] = method
+        env["SERVER_PROTOCOL"] = protocol
         env["REMOTE_ADDR"] = client_address[0]
         if "?" in path:
             path, _, query = path.partition("?")
