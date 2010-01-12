@@ -323,16 +323,16 @@ class HornedWorkerProcess(object):
 
         env = self.baseenv = os.environ.copy()
         host, port = sock.getsockname()[:2]
-        env["SERVER_NAME"] = socket.gethostname()
-        env["SERVER_PORT"] = str(port)
-        env["SERVER_PROTOCOL"] = "http"
-        env["SCRIPT_NAME"] = ""
-        env["wsgi.version"] = (1, 0)
-        env["wsgi.url_scheme"] = "http"
-        env["wsgi.errors"] = sys.stderr
-        env["wsgi.multithread"] = False
-        env["wsgi.multiprocess"] = True
-        env["wsgi.run_once"] = False
+        env.update({"SERVER_NAME": socket.gethostname(),
+                    "SERVER_PORT": str(port), 
+                    "SERVER_PROTOCOL": "http", 
+                    "SCRIPT_NAME": "", 
+                    "wsgi.version": (1, 0), 
+                    "wsgi.url_scheme": "http", 
+                    "wsgi.errors": sys.stderr, 
+                    "wsgi.multithread": False, 
+                    "wsgi.multiprocess": True, 
+                    "wsgi.run_once": False})
 
         signal.signal(signal.SIGQUIT, self.die_gracefully)
         signal.signal(signal.SIGINT, self.die_immediately)
