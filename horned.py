@@ -381,22 +381,18 @@ class HornedWorkerProcess(object):
 
     def handle_request(self, connection, address):
         start = time.time()
-        self.initialize_request(connection, address)
-        env = self.parse_request()
+        self.stream = IOStream(connection)
+        self.headers_sent = False
+        env = self.parse_request(address)
         status, length = self.execute_request(self.app, env)
-        self.finalize_request(connection, address)
+        self.stream.close()
         finish = time.time()
         request = "%s %s %s" % (env["REQUEST_METHOD"],
                                 env["PATH_INFO"],
                                 env["SERVER_PROTOCOL"])
         logging.request(address[0], request, status[:3], length, finish - start)
 
-    def initialize_request(self, connection, address):
-        self.stream = IOStream(connection)
-        self.client_address = address
-        self.headers_sent = False
-
-    def parse_request(self):
+    def parse_request(self, client_address):
         header_data = self.stream.read_until("\r\n\r\n")
         lines = header_data.split("\r\n")
         reqline = lines[0]
@@ -405,7 +401,7 @@ class HornedWorkerProcess(object):
         env = self.baseenv.copy()
 
         env["REQUEST_METHOD"] = method
-        env["REMOTE_ADDR"] = self.client_address[0]
+        env["REMOTE_ADDR"] = client_address[0]
         if "?" in path:
             path, _, query = path.partition("?")
             env["QUERY_STRING"] = query
@@ -440,9 +436,6 @@ class HornedWorkerProcess(object):
         status, headers, data = response
         length = self.send_response(status, headers, chunks, data)
         return status, length
-
-    def finalize_request(self, connection, address):
-        self.stream.close()
 
     def send_headers(self, status, headers):
         write = self.stream.write
