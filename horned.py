@@ -204,6 +204,14 @@ class IOStream(object):
         return line
 
 
+def get_app(name):
+    module_name, _, app_name = name.rpartition(".")
+    module = __import__(module_name)
+    for part in module_name.split(".")[1:]:
+        module = getattr(module, part)
+    app = getattr(module, app_name)
+    return app
+
 DEFAULT_CONFIG = dict(app=demo_app,
                       address=("127.0.0.1", 8080),
                       worker_processes=4,
