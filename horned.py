@@ -325,6 +325,14 @@ class HornedWorkerProcess(object):
         host, port = sock.getsockname()[:2]
         env["SERVER_NAME"] = socket.gethostname()
         env["SERVER_PORT"] = str(port)
+        env["SERVER_PROTOCOL"] = "http"
+        env["SCRIPT_NAME"] = ""
+        env["wsgi.version"] = (1, 0)
+        env["wsgi.url_scheme"] = "http"
+        env["wsgi.errors"] = sys.stderr
+        env["wsgi.multithread"] = False
+        env["wsgi.multiprocess"] = True
+        env["wsgi.run_once"] = False
 
         signal.signal(signal.SIGQUIT, self.die_gracefully)
         signal.signal(signal.SIGINT, self.die_immediately)
@@ -396,22 +404,14 @@ class HornedWorkerProcess(object):
 
         env = self.baseenv.copy()
 
-        env["SERVER_PROTOCOL"] = protocol
         env["REQUEST_METHOD"] = method
         env["REMOTE_ADDR"] = self.client_address[0]
-        env["SCRIPT_NAME"] = ""
         if "?" in path:
             path, _, query = path.partition("?")
             env["QUERY_STRING"] = query
         env["PATH_INFO"] = urlunquote(path)
 
-        env["wsgi.version"] = (1, 0)
-        env["wsgi.url_scheme"] = "http"
         env["wsgi.input"] = self.stream
-        env["wsgi.errors"] = sys.stderr
-        env["wsgi.multithread"] = False
-        env["wsgi.multiprocess"] = True
-        env["wsgi.run_once"] = False
 
         for line in lines[1:]:
             if not line:
