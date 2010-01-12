@@ -65,7 +65,7 @@ class Logger(object):
         self.level = level
 
     def reopen(self, *args, **kwargs):
-        log.info("Reopening log files", pid=True)
+        self.info("Reopening log files", pid=True)
         if not self.stdout.reopen():
             self.error("Could not reopen stdout", pid=True)
         if not self.stderr.reopen():
