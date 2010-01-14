@@ -467,7 +467,7 @@ class HornedWorkerProcess(object):
 
 if __name__ == '__main__':
     import optparse
-    op = optparse.OptionParser(usage="Usage: %prog [options] WSGI_APP")
+    op = optparse.OptionParser(usage="Usage: %prog [options]")
     op.add_option("-c", "--config", dest="config_file", metavar="FILE",
                   help="Path to configuration file")
     general = optparse.OptionGroup(op, "General options")
