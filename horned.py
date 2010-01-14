@@ -225,6 +225,8 @@ class HornedManager(object):
 
         self.worker_processes = self.config.get("worker_processes")
         self.app = self.config.get("app")
+        if isinstance(self.app, basestring):
+            self.app = get_app(self.app)
 
         global log
         log = Logger(self.config.get("access_log"),
@@ -464,12 +466,24 @@ class HornedWorkerProcess(object):
         return length
 
 if __name__ == '__main__':
-    hello_world = dict(app=demo_app,
-                       address=("127.0.0.1", 8080),
-                       worker_processes=4,
-                       access_log="access_log",
-                       error_log="error_log")
-    
-    HornedManager(hello_world).serve_forever()
+    import optparse
+    op = optparse.OptionParser(usage="Usage: %prog [options] WSGI_APP")
+    general = optparse.OptionGroup(op, "General options")
+    general.add_option("--app", dest="app", metavar="WSGI_APP",
+                       help="The WSGI application to run")
+    general.add_option("--listen", dest="address", metavar="ADDRESS",
+                       help="Where to listen for client connections"
+                       " [default: %default]")
+    general.add_option("--workers", dest="worker_processes", type="int", metavar="N",
+                       help="Number of worker processes [default: %default]")
+    op.add_option_group(general)
+    options, args = op.parse_args()
+
+    config = dict((k, v) for (k, v) in options.__dict__.items()
+                  if v is not None)
+    if "address" in config:
+        host, port = tuple(config["address"].split(":"))
+        config["address"] = (host, int(port))
+    HornedManager(config).serve_forever()
 
 
