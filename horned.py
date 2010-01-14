@@ -239,15 +239,15 @@ class HornedManager(object):
         signal.signal(signal.SIGTERM, self.die_immediately)
         signal.signal(signal.SIGUSR1, log.reopen)
 
-    def listen(self, address="127.0.0.1", port=8080):
+    def listen(self, address):
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(self.config.get("address"))
+        self.sock.bind(address)
         self.sock.listen(1024)
 
     def serve_forever(self):
         log.info("Starting manager...", pid=True)
-        self.listen()
+        self.listen(self.config.get("address"))
         log.info("Fired up; ready to go!", pid=True)
         while self.alive:
             self.cleanup_workers()
