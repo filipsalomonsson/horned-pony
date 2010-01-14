@@ -468,6 +468,8 @@ class HornedWorkerProcess(object):
 if __name__ == '__main__':
     import optparse
     op = optparse.OptionParser(usage="Usage: %prog [options] WSGI_APP")
+    op.add_option("-c", "--config", dest="config_file", metavar="FILE",
+                  help="Path to configuration file")
     general = optparse.OptionGroup(op, "General options")
     general.add_option("--app", dest="app", metavar="WSGI_APP",
                        help="The WSGI application to run")
@@ -479,8 +481,12 @@ if __name__ == '__main__':
     op.add_option_group(general)
     options, args = op.parse_args()
 
-    config = dict((k, v) for (k, v) in options.__dict__.items()
-                  if v is not None)
+    config = {}
+    if options.config_file:
+        execfile(options.config_file, {}, config)
+    config.update(dict((k, v) for (k, v)
+                       in options.__dict__.items()
+                       if v is not None))
     if "address" in config:
         host, port = tuple(config["address"].split(":"))
         config["address"] = (host, int(port))
