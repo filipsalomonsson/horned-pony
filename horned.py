@@ -31,6 +31,9 @@ import struct
 
 
 class Logfile(object):
+    """Wrapper class for log files. Delegates write() and flush(), and
+    adds support for reopening the log file for easier log rotation.
+    """
     def __init__(self, filename):
         if isinstance(filename, basestring):
             self.filename = filename
@@ -59,6 +62,9 @@ class Logfile(object):
 
 DEBUG, INFO, ERROR = 1, 2, 3
 class Logger(object):
+    """Basic logger.
+    Logs requests separately, and supports log file reopening.
+    """
     def __init__(self, stdout=sys.stdout, stderr=sys.stderr, level=INFO):
         self.stdout = Logfile(stdout)
         self.stderr = Logfile(stderr)
@@ -102,11 +108,13 @@ class Logger(object):
 
 log = Logger()
 
+# hex-to-character lookup table for urlunquote
 charfromhex = {}
 for i in xrange(256):
     charfromhex["%02x" % i] = charfromhex["%02X" % i] = chr(i)
 
 def urlunquote(quoted):
+    """Unquote a URL-encoded string (%20 -> " ", etc)"""
     unquoted = ""
     while "%" in quoted:
         before, _, after = quoted.partition("%")
@@ -116,6 +124,7 @@ def urlunquote(quoted):
     return unquoted
 
 def demo_app(environ,start_response):
+    """A simple "Hello world!" WSGI application"""
     start_response("200 OK", [('Content-Type','text/html')])
     return ["<html><head><title>Hello world!</title></head>"
             "<body><h1>Hello world!</h1></body></html>\n\n"]
@@ -125,6 +134,8 @@ HTTP_MONTH = (None, "Jan", "Feb", "Mar", "Apr", "May", "Jun",
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 def http_date(timestamp=None):
+    """Return timestamp formatted for the HTTP Date header. Uses
+    current time if no timestamp is given."""
     timestamp = timestamp or time.time()
     (year, month, day, hour, minute, second,
      weekday, yearday, isdst) = time.gmtime(timestamp)
@@ -134,12 +145,15 @@ def http_date(timestamp=None):
 
 
 class IOStream(object):
+    """Buffered file-like wrapper for sockets."""
     def __init__(self, socket):
         self.socket = socket
         self.read_buffer = ""
         self.write_buffer = ""
 
     def read(self, size=-1):
+        """Return the next 'size' bytes from the socket. If no size is
+        given, reads until EOF."""
         if size < 0:
             while True:
                 chunk = self.socket.recv(4096)
@@ -159,6 +173,9 @@ class IOStream(object):
             return result
 
     def read_until(self, delimiter):
+        """Read from the socket until the first occurence of the given
+        delimiter. Raises ValueError if EOF is reached before delimiter
+        is found."""
         while delimiter not in self.read_buffer:
             chunk = self.socket.recv(4096)
             if not chunk:
@@ -205,6 +222,8 @@ class IOStream(object):
 
 
 def get_app(name):
+    """Given a string like "my_module.my_object", import my_module and
+    return my_object."""
     module_name, _, app_name = name.rpartition(".")
     module = __import__(module_name)
     for part in module_name.split(".")[1:]:
@@ -297,6 +316,8 @@ class HornedManager(object):
 
 
 class HornedWorker:
+    """Management class for worker processes. This is kept in the
+    manager process as an interface to the workers."""
     def __init__(self, sock, app):
         self.sock = sock
         self.app = app
@@ -305,6 +326,7 @@ class HornedWorker:
         self.requests = self.errors = 0
 
     def run(self):
+        """Fork a worker process and start serving clients."""
         pid = os.fork()
         if pid:
             log.info("Spawned worker #%d." % pid, pid=True)
@@ -325,6 +347,8 @@ class HornedWorker:
 
 
 class HornedWorkerProcess(object):
+    """Worker process. Accepts connections from clients and handles
+    the HTTP requests."""
     def __init__(self, sock, app):
         self.sock = sock
         self.app = app
@@ -350,6 +374,7 @@ class HornedWorkerProcess(object):
         signal.signal(signal.SIGTERM, self.die_immediately)
 
     def serve_forever(self):
+        """Enter main loop, serving client until shutdown."""
         log.info("Fired up; ready to go!", pid=True)
         while self.alive:
             try:
@@ -388,6 +413,7 @@ class HornedWorkerProcess(object):
         sys.exit(0)
 
     def handle_request(self, connection, address):
+        """Handle a request and log it."""
         start = time.time()
         self.stream = IOStream(connection)
         self.headers_sent = False
@@ -398,6 +424,8 @@ class HornedWorkerProcess(object):
         log.request(address[0], reqline, status[:3], length, finish - start)
 
     def parse_request(self, client_address):
+        """Read and parse an HTTP request, build the wsgi environment
+        dict, and return a (reqline, env) tuple."""
         header_data = self.stream.read_until("\r\n\r\n")
         lines = header_data.split("\r\n")
         reqline = lines[0]
@@ -413,6 +441,7 @@ class HornedWorkerProcess(object):
         env["PATH_INFO"] = urlunquote(path)
         env["wsgi.input"] = self.stream
 
+        # Parse the HTTP request headers
         for line in lines[1:]:
             if not line: break
             key, _, value = line.partition(":")
@@ -422,6 +451,8 @@ class HornedWorkerProcess(object):
         return reqline, env
 
     def execute_request(self, app, env):
+        """Call the wsgi app, send the HTTP response to the client,
+        and return a (status, length) tuple."""
         data = []
         response = [None, [], data]
         def start_response(status, response_headers, exc_info=None):
@@ -440,6 +471,7 @@ class HornedWorkerProcess(object):
         return status, length
 
     def send_headers(self, status, headers):
+        """Send the headers of an HTTP response to the client."""
         write = self.stream.write
         if not self.headers_sent:
             write("HTTP/1.1 %s\r\n" % status)
@@ -453,6 +485,9 @@ class HornedWorkerProcess(object):
             self.stream.flush()
 
     def send_response(self, status, headers, chunks, data=None):
+        """Send the HTTP resopnse to the client. Do not send headers
+        until there is body data available (or until we know there
+        will be none)."""
         write = self.stream.write
         length = 0
         for chunks in [data, chunks, [""]]:
