@@ -231,8 +231,8 @@ def get_app(name):
     app = getattr(module, app_name)
     return app
 
-DEFAULT_CONFIG = dict(app=demo_app,
-                      address=("127.0.0.1", 8080),
+DEFAULT_CONFIG = dict(application=demo_app,
+                      listen=("127.0.0.1", 8080),
                       worker_processes=4,
                       access_log=sys.stdout,
                       error_log=sys.stderr)
@@ -243,7 +243,7 @@ class HornedManager(object):
         self.config.update(config)
 
         self.worker_processes = self.config.get("worker_processes")
-        self.app = self.config.get("app")
+        self.app = self.config.get("application")
         if isinstance(self.app, basestring):
             self.app = get_app(self.app)
 
@@ -268,7 +268,7 @@ class HornedManager(object):
 
     def serve_forever(self):
         log.info("Starting manager...", pid=True)
-        self.listen(self.config.get("address"))
+        self.listen(self.config.get("listen"))
         log.info("Fired up; ready to go!", pid=True)
         while self.alive:
             self.cleanup_workers()
@@ -506,9 +506,9 @@ if __name__ == '__main__':
     op.add_option("-c", "--config", dest="config_file", metavar="FILE",
                   help="Path to configuration file")
     general = optparse.OptionGroup(op, "General options")
-    general.add_option("--app", dest="app", metavar="WSGI_APP",
+    general.add_option("--app", dest="application", metavar="WSGI_APP",
                        help="The WSGI application to run")
-    general.add_option("--listen", dest="address", metavar="ADDRESS",
+    general.add_option("--listen", dest="listen", metavar="ADDRESS",
                        help="Where to listen for client connections"
                        " [default: %default]")
     general.add_option("--workers", dest="worker_processes", type="int", metavar="N",
