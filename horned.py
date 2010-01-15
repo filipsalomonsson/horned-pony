@@ -518,7 +518,8 @@ if __name__ == '__main__':
 
     config = {}
     if options.config_file:
-        execfile(options.config_file, {}, config)
+        config_file = os.path.abspath(options.config_file)
+        execfile(config_file, {"__file__": config_file}, config)
     config.update(dict((k, v) for (k, v)
                        in options.__dict__.items()
                        if v is not None))
