@@ -261,7 +261,10 @@ class HornedManager(object):
         signal.signal(signal.SIGUSR1, log.reopen)
 
     def listen(self, address):
-        self.sock = socket.socket()
+        if isinstance(address, basestring) and address.startswith("/"):
+            self.sock = socket.socket(socket.AF_UNIX)
+        else:
+            self.sock = socket.socket(socket.AF_INET)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(address)
         self.sock.listen(1024)
@@ -421,7 +424,8 @@ class HornedWorkerProcess(object):
         status, length = self.execute_request(self.app, env)
         self.stream.close()
         finish = time.time()
-        log.request(address[0], reqline, status[:3], length, finish - start)
+        client = env.get("REMOTE_ADDR", "-")
+        log.request(client, reqline, status[:3], length, finish - start)
 
     def parse_request(self, client_address):
         """Read and parse an HTTP request, build the wsgi environment
@@ -434,7 +438,7 @@ class HornedWorkerProcess(object):
         env = self.baseenv.copy()
         env["REQUEST_METHOD"] = method
         env["SERVER_PROTOCOL"] = protocol
-        env["REMOTE_ADDR"] = client_address[0]
+        env["REMOTE_ADDR"] = client_address and client_address[0] or ""
         if "?" in path:
             path, _, query = path.partition("?")
             env["QUERY_STRING"] = query
