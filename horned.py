@@ -237,6 +237,7 @@ DEFAULT_CONFIG = dict(
     worker_processes=4,
     access_log=sys.stdout,
     error_log=sys.stderr,
+    real_ip_header=None,
     )
 
 class HornedManager(object):
@@ -454,6 +455,11 @@ class HornedWorkerProcess(object):
             key = key.replace("-", "_").upper()
             value = value.strip()
             env["HTTP_" + key] = value
+
+        real_ip_header = self.config.get("real_ip_header")
+        if real_ip_header is not None and real_ip_header in env:
+            env["REMOTE_ADDR"] = env[real_ip_header]
+
         return reqline, env
 
     def execute_request(self, app, env):
