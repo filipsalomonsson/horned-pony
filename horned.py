@@ -243,9 +243,6 @@ class HornedManager(object):
         self.config.update(config)
 
         self.worker_processes = self.config.get("worker_processes")
-        self.app = self.config.get("application")
-        if isinstance(self.app, basestring):
-            self.app = get_app(self.app)
 
         global log
         log = Logger(self.config.get("access_log"),
@@ -302,7 +299,7 @@ class HornedManager(object):
 
     def spawn_workers(self):
         while len(self.workers) < self.worker_processes:
-            worker = HornedWorker(self.sock, self.app)
+            worker = HornedWorker(self.sock, self.config)
             self.workers.add(worker)
             worker.run()
 
@@ -321,9 +318,12 @@ class HornedManager(object):
 class HornedWorker:
     """Management class for worker processes. This is kept in the
     manager process as an interface to the workers."""
-    def __init__(self, sock, app):
+    def __init__(self, sock, config):
         self.sock = sock
-        self.app = app
+        self.config = config
+        self.app = self.config.get("application")
+        if isinstance(self.app, basestring):
+            self.app = get_app(self.app)
         self.pid = None
         self.timestamp = int(time.time())
         self.requests = self.errors = 0
