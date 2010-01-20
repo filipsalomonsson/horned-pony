@@ -324,9 +324,6 @@ class HornedWorker:
     def __init__(self, sock, config):
         self.sock = sock
         self.config = config
-        self.app = self.config.get("application")
-        if isinstance(self.app, basestring):
-            self.app = get_app(self.app)
         self.pid = None
         self.timestamp = int(time.time())
         self.requests = self.errors = 0
@@ -338,7 +335,7 @@ class HornedWorker:
             log.info("Spawned worker #%d." % pid, pid=True)
             self.pid = pid
         else:
-            HornedWorkerProcess(self.sock, self.app).run()
+            HornedWorkerProcess(self.sock, self.config).run()
 
     def die_gracefully(self):
         log.info("Sending SIGQUIT to worker #%d" % self.pid, pid=True)
@@ -355,9 +352,12 @@ class HornedWorker:
 class HornedWorkerProcess(object):
     """Worker process. Accepts connections from clients and handles
     the HTTP requests."""
-    def __init__(self, sock, app):
+    def __init__(self, sock, config):
         self.sock = sock
-        self.app = app
+        self.config = config
+        self.app = self.config.get("application")
+        if isinstance(self.app, basestring):
+            self.app = get_app(self.app)
         self.alive = True
         self.requests = 0
         self.errors = 0
