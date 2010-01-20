@@ -269,7 +269,7 @@ class HornedManager(object):
         self.sock.bind(address)
         self.sock.listen(1024)
 
-    def serve_forever(self):
+    def run(self):
         log.info("Starting manager...", pid=True)
         self.listen(self.config.get("listen"))
         log.info("Fired up; ready to go!", pid=True)
@@ -338,7 +338,7 @@ class HornedWorker:
             log.info("Spawned worker #%d." % pid, pid=True)
             self.pid = pid
         else:
-            HornedWorkerProcess(self.sock, self.app).serve_forever()
+            HornedWorkerProcess(self.sock, self.app).run()
 
     def die_gracefully(self):
         log.info("Sending SIGQUIT to worker #%d" % self.pid, pid=True)
@@ -379,7 +379,7 @@ class HornedWorkerProcess(object):
         signal.signal(signal.SIGINT, self.die_immediately)
         signal.signal(signal.SIGTERM, self.die_immediately)
 
-    def serve_forever(self):
+    def run(self):
         """Enter main loop, serving client until shutdown."""
         log.info("Fired up; ready to go!", pid=True)
         while self.alive:
@@ -538,6 +538,6 @@ if __name__ == '__main__':
     if "address" in config:
         host, port = tuple(config["address"].split(":"))
         config["address"] = (host, int(port))
-    HornedManager(config).serve_forever()
+    HornedManager(config).run()
 
 
