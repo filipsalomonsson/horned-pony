@@ -231,11 +231,13 @@ def get_app(name):
     app = getattr(module, app_name)
     return app
 
-DEFAULT_CONFIG = dict(application=demo_app,
-                      listen=("127.0.0.1", 8080),
-                      worker_processes=4,
-                      access_log=sys.stdout,
-                      error_log=sys.stderr)
+DEFAULT_CONFIG = dict(
+    application=demo_app,
+    listen=("127.0.0.1", 8080),
+    worker_processes=4,
+    access_log=sys.stdout,
+    error_log=sys.stderr,
+    )
 
 class HornedManager(object):
     def __init__(self, config):
