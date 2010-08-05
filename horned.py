@@ -358,6 +358,7 @@ class HornedWorkerProcess(object):
         self.app = self.config.get("application")
         if isinstance(self.app, basestring):
             self.app = get_app(self.app)
+        self.access_log = self.get("access_log")
         self.alive = True
         self.requests = 0
         self.errors = 0
@@ -426,9 +427,10 @@ class HornedWorkerProcess(object):
         reqline, env = self.parse_request(address)
         status, length = self.execute_request(self.app, env)
         self.stream.close()
-        finish = time.time()
-        client = env.get("REMOTE_ADDR", "-")
-        log.request(client, reqline, status[:3], length, finish - start)
+        if self.access_log:
+            finish = time.time()
+            client = env.get("REMOTE_ADDR", "-")
+            log.request(client, reqline, status[:3], length, finish - start)
 
     def parse_request(self, client_address):
         """Read and parse an HTTP request, build the wsgi environment
