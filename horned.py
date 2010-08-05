@@ -278,9 +278,16 @@ class HornedManager(object):
             self.cleanup_workers()
             self.spawn_workers()
             time.sleep(1)
-        log.info("Reaping workers...", pid=True)
+        self.stop_workers()
+        self.reap_workers()
+        log.info("Manager done. Exiting.", pid=True)
+
+    def stop_workers(self):
+        log.info("Stopping workers...", pid=True)
         for worker in self.workers:
             worker.die_gracefully()
+
+    def reap_workers(self):
         t = time.time()
         while self.workers:
             if time.time() - t > 10:
@@ -292,7 +299,6 @@ class HornedManager(object):
                 if pid:
                     self.workers.remove(worker)
             time.sleep(0.1)
-        log.info("Manager done. Exiting.", pid=True)
 
     def cleanup_workers(self):
         for worker in list(self.workers):
