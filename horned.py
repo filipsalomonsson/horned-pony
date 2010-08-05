@@ -506,7 +506,7 @@ class HornedWorkerProcess(object):
             self.stream.flush()
 
     def send_response(self, status, headers, chunks, data=None):
-        """Send the HTTP resopnse to the client. Do not send headers
+        """Send the HTTP response to the client. Do not send headers
         until there is body data available (or until we know there
         will be none)."""
         write = self.stream.write
