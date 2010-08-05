@@ -168,6 +168,7 @@ class IOStream(object):
                 chunk = self.socket.recv(4096)
                 if not chunk:
                     break
+                self.read_buffer += chunk
             result = self.read_buffer[:size]
             self.read_buffer = self.read_buffer[size:]
             return result
