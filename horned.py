@@ -495,7 +495,7 @@ class HornedWorkerProcess(object):
         """Send the headers of an HTTP response to the client."""
         write = self.stream.write
         if not self.headers_sent:
-            write("HTTP/1.1 %s\r\n" % status)
+            write("HTTP/1.0 %s\r\n" % status)
             write("Date: %s\r\n" % (http_date(),))
             for header in headers:
                 if header[0].lower() not in ("connection", "date"):
